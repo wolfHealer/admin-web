@@ -21,6 +21,14 @@ const routes = [
         path: 'user',
         component: () => import('@/views/user/UserList.vue'),
       },
+      {
+        path: 'feedback',
+        component: () => import('@/views/feedback/FeedbackList.vue'),
+      },
+      {
+        path: 'logs',
+        component: () => import('@/views/admin/OperationLogs.vue'),
+      },
     ],
   },
 ]

@@ -16,13 +16,26 @@
 
 <script setup lang="ts">
 import { reactive } from 'vue'
+import adminService from '../../services/adminService'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+
+const router = useRouter()
 
 const form = reactive({
   username: '',
   password: '',
 })
 
-const login = () => {
-  console.log('login', form)
+const login = async () => {
+  try {
+    const res: any = await adminService.authenticate(form.username, form.password)
+    localStorage.setItem('token', res.token)
+    localStorage.setItem('adminUser', form.username)
+    ElMessage.success('登录成功')
+    router.replace('/')
+  } catch (e: any) {
+    ElMessage.error(e.message || '登录失败')
+  }
 }
 </script>
