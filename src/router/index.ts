@@ -3,31 +3,31 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   {
     path: '/login',
-    component: () => import('@/views/login/Login.vue'),
+    component: () => import('../views/login/Login.vue'),
   },
   {
     path: '/',
-    component: () => import('@/layout/AdminLayout.vue'),
+    component: () => import('../layout/AdminLayout.vue'),
     children: [
       {
         path: 'post',
-        component: () => import('@/views/post/PostAudit.vue'),
+        component: () => import('../views/post/PostAudit.vue'),
       },
       {
         path: 'resource',
-        component: () => import('@/views/resource/ResourceAudit.vue'),
+        component: () => import('../views/resource/ResourceAudit.vue'),
       },
       {
         path: 'user',
-        component: () => import('@/views/user/UserList.vue'),
+        component: () => import('../views/user/UserList.vue'),
       },
       {
         path: 'feedback',
-        component: () => import('@/views/feedback/FeedbackList.vue'),
+        component: () => import('../views/feedback/FeedbackList.vue'),
       },
       {
         path: 'logs',
-        component: () => import('@/views/admin/OperationLogs.vue'),
+        component: () => import('../views/admin/OperationLogs.vue'),
       },
     ],
   },
