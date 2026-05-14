@@ -32,6 +32,24 @@ const routes = [
         meta: { title: '病友交流' }
       },
       {
+        path: '/expert',
+        name: 'Expert',
+        component: () => import('@/views/expert/index.vue'), // 确保该文件存在
+        meta: { title: '专家管理' }
+      },
+      {
+        path: '/user',
+        name: 'User',
+        component: () => import('@/views/user/User.vue'), // 确保该文件存在
+        meta: { title: '用户管理' }
+      },
+      {
+        path: '/region',
+        name: 'Region',
+        component: () => import('@/views/region/Region.vue'),
+        meta: { title: '区域管理' }
+      },
+      {
         path: 'resource',
         name: 'Resource',
         component: () => import('@/views/resource/Resource.vue'),
@@ -57,23 +75,12 @@ const routes = [
             meta: { title: '医生名录' }
           },
           {
-            path: 'medical/guideline',
-            name: 'MedicalGuideline',
-            component: () => import('@/views/resource/medical/GuidelineList.vue'),
-            meta: { title: '诊疗指南' }
-          },
-          {
             path: 'medical/examination',
             name: 'MedicalExamination',
             component: () => import('@/views/resource/medical/ExaminationList.vue'),
             meta: { title: '检查项目' }
           },
-          {
-            path: 'medical/case',
-            name: 'MedicalCase',
-            component: () => import('@/views/resource/medical/CaseTemplate.vue'),
-            meta: { title: '病例模版' }
-          },
+
           // ==================== 用药信息平台 ====================
           {
             path: 'drug',
@@ -83,27 +90,21 @@ const routes = [
           },
           {
             path: 'drug/rare-drug',
-            name: 'RareDrugList',
-            component: () => import('@/views/resource/drug/RareDrugList.vue'),
+            name: 'DrugList',
+            component: () => import('@/views/resource/drug/DrugList.vue'),
             meta: { title: '罕见病药品名录' }
           },
           {
             path: 'drug/purchase-channel',
-            name: 'PurchaseChannelList',
-            component: () => import('@/views/resource/drug/PurchaseChannelList.vue'),
+            name: 'ChannelList',
+            component: () => import('@/views/resource/drug/ChannelList.vue'),
             meta: { title: '正规购药渠道' }
           },
           {
             path: 'drug/assistance-program',
-            name: 'AssistanceProgramList',
-            component: () => import('@/views/resource/drug/AssistanceProgramList.vue'),
+            name: 'DonationProjectList',
+            component: () => import('@/views/resource/drug/DonationProjectList.vue'),
             meta: { title: '赠药/援助项目' }
-          },
-          {
-            path: 'drug/management-tool',
-            name: 'ManagementToolList',
-            component: () => import('@/views/resource/drug/ManagementToolList.vue'),
-            meta: { title: '用药管理工具' }
           },
           // ==================== 公益救助中心 ====================
           {
@@ -114,26 +115,20 @@ const routes = [
           },
           {
             path: 'charity/project',
-            name: 'CharityProject',
-            component: () => import('@/views/resource/charity/ProjectList.vue'),
+            name: 'AidProject',
+            component: () => import('@/views/resource/charity/AidProjectList.vue'),
             meta: { title: '救助项目库' }
           },
           {
-            path: 'charity/policy',
-            name: 'CharityPolicy',
-            component: () => import('@/views/resource/charity/PolicyList.vue'),
-            meta: { title: '医保政策解读' }
-          },
-          {
             path: 'charity/case',
-            name: 'CharityCase',
-            component: () => import('@/views/resource/charity/CaseList.vue'),
+            name: 'CaseShare',
+            component: () => import('@/views/resource/charity/CaseShareList.vue'),
             meta: { title: '救助案例分享' }
           },
           {
             path: 'charity/channel',
-            name: 'CharityChannel',
-            component: () => import('@/views/resource/charity/ChannelList.vue'),
+            name: 'HelpChannel',
+            component: () => import('@/views/resource/charity/HelpChannelList.vue'),
             meta: { title: '求助通道指引' }
           },
           // ==================== 康复支持专区 ====================
@@ -145,33 +140,36 @@ const routes = [
           },
           {
             path: 'rehab/rehabilitation-guide',
-            name: 'RehabilitationGuideList',
-            component: () => import('@/views/resource/rehab/RehabilitationGuideList.vue'),
+            name: 'RehabGuideList',
+            component: () => import('@/views/resource/rehab/RehabGuideList.vue'),
             meta: { title: '康复训练指南' }
           },
           {
-            path: 'rehab/home-care-manual',
-            name: 'HomeCareManualList',
-            component: () => import('@/views/resource/rehab/HomeCareManualList.vue'),
-            meta: { title: '居家护理手册' }
-          },
-          {
             path: 'rehab/psychological-support',
-            name: 'PsychologicalSupportList',
-            component: () => import('@/views/resource/rehab/PsychologicalSupportList.vue'),
+            name: 'PsychologicalOrgList',
+            component: () => import('@/views/resource/rehab/PsychologicalOrgList.vue'),
             meta: { title: '心理支持资源' }
           },
           {
             path: 'rehab/organization',
-            name: 'OrganizationList',
-            component: () => import('@/views/resource/rehab/OrganizationList.vue'),
+            name: 'RehabInstitutionList',
+            component: () => import('@/views/resource/rehab/RehabInstitutionList.vue'),
             meta: { title: '康复机构' }
           },
-           {
-            path: 'rehab/equipment',
-            name: 'EquipmentList',
-            component: () => import('@/views/resource/rehab/EquipmentList.vue'),
-            meta: { title: '康复设备' }
+
+
+          // ==================== 医保政策解读 ====================
+          {
+            path: 'medicare',
+            name: 'ResourceMedicare',
+            component: () => import('@/views/resource/medicare/Medicare.vue'),
+            meta: { title: '医保' }
+          },
+          {
+            path: 'medicare/policy',
+            name: 'MedicarePolicy',
+            component: () => import('@/views/resource/medicare/PolicyList.vue'),
+            meta: { title: '医保政策解读' }
           },
         ]
       }

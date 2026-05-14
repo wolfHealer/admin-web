@@ -23,13 +23,12 @@
 </template>
 
 <script setup lang="ts">
-import { Shop, Tools } from '@element-plus/icons-vue'
+import { Shop } from '@element-plus/icons-vue'
 
 const modules = [
   { name: '罕见病药品名录', path: 'rare-drug', icon: Shop, desc: '管理罕见病药品信息和名录' },
   { name: '正规购药渠道', path: 'purchase-channel', icon: Shop, desc: '管理正规药店和医院渠道' },
   { name: '赠药/援助项目', path: 'assistance-program', icon: Shop, desc: '管理药品援助和赠药项目' },
-  { name: '用药管理工具', path: 'management-tool', icon: Tools, desc: '管理用药提醒和查询工具' }
 ]
 </script>
 

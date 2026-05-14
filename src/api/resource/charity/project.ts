@@ -1,65 +1,106 @@
-// src/api/resource/charity/charity.ts
 import request from '@/utils/request'
 
-export interface CharityParams {
+export interface ApiResponse<T = any> {
+  code: number
+  data: T
+  message?: string
+}
+
+// src/api/resource/charity/project.ts
+
+export interface DiseaseOption {
+  id: number;
+  name: string;
+  alias?: string;
+}
+
+export interface ReliefProjectItem {
+  id?: number;
+  name: string;
+  organizer: string;
+  reliefType: string; // 对应后端的 type 或 reliefType，需根据实际后端调整，这里假设前端统一用 reliefType
+  applyCondition: string;
+  reliefStandard: string;
+  applyDeadline?: string;
+  applyDifficulty: string;
+  applyProcess: string;
+  applyForm?: string;
+  applyGuide?: string;
+  materialList?: string;
+  contactPhone?: string;
+  contactUrl?: string;
+  auditStatus: number;
+  rejectReason?: string;
+  sort: number;
+  
+  // 关键：用于表单提交和展示的 ID 列表
+  diseaseIds?: number[]; 
+  // 关键：后端详情接口返回的完整对象列表，用于展示名称
+  diseases?: DiseaseOption[]; 
+}
+
+export interface ReliefProjectListParams {
   page: number
   pageSize: number
   keyword?: string
-  status?: string
-  type?: string
+  reliefType?: string
+  applyDifficulty?: string
+  auditStatus?: number | ''
+  diseaseId?: number | ''
 }
 
-export interface CharityProject {
-  id: number
-  title: string
-  org?: string
-  desc?: string
-  status: string
-  type: string
-  disease?: number
-  amount: string
-  difficulty?: string
-  uploadTime?: string
-  contactInfo?: string
+export interface ReliefProjectListResponse {
+  list: ReliefProjectItem[]
+  total: number
 }
 
-
-
-// ============ 救助项目库 ============
-export const getProjectList = (params: CharityParams) => {
-  return request({
+export const getReliefProjectList = (params: ReliefProjectListParams) => {
+  return request<ApiResponse<ReliefProjectListResponse>>({
     url: '/resource/charity/projects',
     method: 'get',
-    params
+    params,
   })
 }
 
-export const getProjectDetail = (id: number) => {
-  return request({
+export const getReliefProjectDetail = (id: number) => {
+  return request<ApiResponse<ReliefProjectItem>>({
     url: `/resource/charity/projects/${id}`,
-    method: 'get'
+    method: 'get',
   })
 }
 
-export const addProject = (data: Partial<CharityProject>) => {
-  return request({
+export const addReliefProject = (data: Partial<ReliefProjectItem>) => {
+  return request<ApiResponse>({
     url: '/resource/charity/projects',
     method: 'post',
-    data
+    data,
   })
 }
 
-export const updateProject = (id: number, data: Partial<CharityProject>) => {
-  return request({
+export const updateReliefProject = (id: number, data: Partial<ReliefProjectItem>) => {
+  return request<ApiResponse>({
     url: `/resource/charity/projects/${id}`,
     method: 'put',
-    data
+    data,
   })
 }
 
-export const deleteProject = (id: number) => {
-  return request({
+export const deleteReliefProject = (id: number) => {
+  return request<ApiResponse>({
     url: `/resource/charity/projects/${id}`,
-    method: 'delete'
+    method: 'delete',
+  })
+}
+
+export const searchDiseaseOptions = (keyword = '') => {
+  return request<ApiResponse<{ list: DiseaseOption[] } | DiseaseOption[]>>({
+    url: '/knowledge/diseases',
+    method: 'get',
+    params: {
+      page: 1,
+      pageSize: 20,
+      keyword,
+      status: 1,
+    },
   })
 }

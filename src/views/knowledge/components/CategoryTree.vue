@@ -1,46 +1,47 @@
-<!-- src/views/knowledge/components/CategoryTree.vue -->
 <template>
-  <el-card class="category-card">
+  <el-card class="category-card" v-loading="false">
     <template #header>
       <div class="card-header">
-        <span>疾病分类</span>
-        <el-button type="primary" size="small" @click="$emit('add')">
+        <span>分类树</span>
+        <el-button type="primary" size="small" @click="$emit('add-root')">
           <el-icon><Plus /></el-icon>
+          新增一级分类
         </el-button>
       </div>
     </template>
-    
-    <el-input
-      v-model="searchText"
-      placeholder="搜索分类"
-      size="small"
-      clearable
-      class="search-input"
-    >
+
+    <el-input v-model="searchText" placeholder="搜索分类" size="small" clearable class="search-input">
       <template #prefix>
         <el-icon><Search /></el-icon>
       </template>
     </el-input>
-    
+
     <el-tree
+      ref="treeRef"
       :data="categoryTree"
       :props="treeProps"
       node-key="id"
       default-expand-all
-      :expand-on-click-node="false"
       :filter-node-method="filterNode"
       :highlight-current="true"
-      ref="treeRef"
       class="category-tree"
     >
       <template #default="{ node, data }">
         <div class="tree-node">
-          <span @click="handleSelect(data)">
-            {{ node.label }}
-          </span>
+          <div class="node-main" @click="handleSelect(data)">
+            <span class="node-name">{{ node.label }}</span>
+            <el-tag size="small" effect="plain">L{{ data.level }}</el-tag>
+          </div>
           <div class="node-actions">
-            <el-icon @click.stop="$emit('edit', data)"><Edit /></el-icon>
-            <el-icon @click.stop="$emit('delete', data)"><Delete /></el-icon>
+            <el-tooltip content="新增子分类">
+              <el-icon @click.stop="$emit('add-child', data)"><CirclePlus /></el-icon>
+            </el-tooltip>
+            <el-tooltip content="编辑分类">
+              <el-icon @click.stop="$emit('edit', data)"><Edit /></el-icon>
+            </el-tooltip>
+            <el-tooltip content="删除分类">
+              <el-icon @click.stop="$emit('delete', data)"><Delete /></el-icon>
+            </el-tooltip>
           </div>
         </div>
       </template>
@@ -48,24 +49,24 @@
   </el-card>
 </template>
 
-
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { Plus, Search, Edit, Delete } from '@element-plus/icons-vue'
-import type { Category } from '@/api/knowledge/knowledge'
+import { Plus, Search, Edit, Delete, CirclePlus } from '@element-plus/icons-vue'
 import type { ElTree } from 'element-plus'
+import type { CategoryTreeNode } from '@/api/knowledge/knowledge'
 
 interface Props {
-  categoryTree: Category[]
+  categoryTree: CategoryTreeNode[]
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 
 const emit = defineEmits<{
-  add: []
-  edit: [data: Category]
-  delete: [data: Category]
-  select: [data: Category]
+  'add-root': []
+  'add-child': [data: CategoryTreeNode]
+  edit: [data: CategoryTreeNode]
+  delete: [data: CategoryTreeNode]
+  select: [data: CategoryTreeNode]
 }>()
 
 const searchText = ref('')
@@ -73,68 +74,71 @@ const treeRef = ref<InstanceType<typeof ElTree>>()
 
 const treeProps = {
   children: 'children',
-  label: 'name'
+  label: 'name',
 }
 
-
-const filterNode = (value: string, data: Category) => {
+const filterNode = (value: string, data: CategoryTreeNode) => {
   if (!value) return true
-  return data.name.includes(value)
+  return data.name.includes(value) || data.code.includes(value)
 }
 
 watch(searchText, (val) => {
   treeRef.value?.filter(val)
 })
 
-const handleSelect = (data: Category) => {
-  emit('select', data)
-}
+const handleSelect = (data: CategoryTreeNode) => emit('select', data)
 </script>
 
-<style lang="scss" scoped>
+<style scoped lang="scss">
+.category-card {
+  min-height: 620px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.search-input {
+  margin-bottom: 12px;
+}
+
 .category-tree {
-  max-height: 500px;
+  max-height: 540px;
   overflow-y: auto;
+}
 
-  .tree-node {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    padding-right: 8px;
+.tree-node {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 
-    span {
-      cursor: pointer;
-      flex: 1;
+.node-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  cursor: pointer;
+}
 
-      &:hover {
-        color: #409eff;
-      }
-    }
+.node-name:hover {
+  color: var(--el-color-primary);
+}
 
-    .node-actions {
-      display: none;
-      gap: 8px;
+.node-actions {
+  display: none;
+  gap: 8px;
+}
 
-      .el-icon {
-        cursor: pointer;
-        font-size: 14px;
+.node-actions .el-icon {
+  cursor: pointer;
+}
 
-        &:hover {
-          color: #409eff;
-        }
-      }
-    }
-
-    &:hover .node-actions {
-      display: flex;
-    }
-  }
-  
-  // 选中状态样式
-  :deep(.el-tree-node.is-current > .el-tree-node__content) {
-    background-color: #ecf5ff;
-    color: #409eff;
-  }
+.tree-node:hover .node-actions {
+  display: inline-flex;
 }
 </style>

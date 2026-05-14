@@ -22,14 +22,12 @@
 </template>
 
 <script setup lang="ts">
-import { OfficeBuilding, User, Document, Files } from '@element-plus/icons-vue'
+import { OfficeBuilding, User, Files } from '@element-plus/icons-vue'
 
 const modules = [
   { name: '医院名录', path: 'hospital', icon: OfficeBuilding, desc: '管理医院信息和名录' },
   { name: '医生名录', path: 'doctor', icon: User, desc: '管理医生信息和名录' },
-  { name: '诊疗指南', path: 'guideline', icon: Document, desc: '诊疗规范和指南文档' },
   { name: '检查项目', path: 'examination', icon: Files, desc: '医学检查项目配置' },
-  { name: '病例模版', path: 'case', icon: Files, desc: '标准化病例模版管理' }
 ]
 </script>
 

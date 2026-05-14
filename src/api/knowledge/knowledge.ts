@@ -1,197 +1,194 @@
-// src/api/knowledge.ts
 import request from '@/utils/request'
 
-// ==================== 类型定义 ====================
-export interface Category {
+export interface CategoryTreeNode {
   id: number
+  parentId: number
+  level: number
   name: string
+  code: string
   description?: string
   iconUrl?: string
   sortOrder: number
   status: 0 | 1
+  children?: CategoryTreeNode[]
   createdAt?: string
   updatedAt?: string
 }
 
-export interface CategoryListResponse {
-  code: number
-  data: {
-    categories: Category[]
-  }
-  message: string
+export interface TagItem {
+  id: number
+  name: string
+  code: string
+  sortOrder: number
+  status: 0 | 1
+  useCount?: number
+  createdAt?: string
+  updatedAt?: string
 }
 
-// ==================== 分类相关接口 ====================
-// 获取分类列表
-export const getCategoryList = () => {
-  return request.get<any, CategoryListResponse>('/knowledge/categories')
+export interface SimpleCategory {
+  id: number
+  name: string
+  code: string
 }
 
+export interface SimpleTag {
+  id: number
+  name: string
+  code: string
+}
 
-// 修改：获取某分类下的疾病列表
-export const getDiseaseListByCategory = (categoryId: number, params?: any) => {
-  return request({
-    url: `/knowledge/category/${categoryId}/diseases`,
-    method: 'get',
-    params
+export interface Disease {
+  id: number
+  name: string
+  alias?: string
+  introduction?: string
+  symptoms?: string
+  images?: string[]
+  status: 0 | 1
+  primaryCategoryId?: number
+  primaryCategoryName?: string
+  categoryIds?: number[]
+  categories?: SimpleCategory[]
+  tagIds?: number[]
+  tags?: SimpleTag[]
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface DiseaseListParams {
+  page: number
+  pageSize: number
+  keyword?: string
+  status?: number | null
+  categoryId?: number | null
+  tagId?: number | null
+}
+
+export interface DiseaseSubmitPayload {
+  name: string
+  alias?: string
+  introduction?: string
+  symptoms?: string
+  images?: string[]
+  status: 0 | 1
+  primaryCategoryId: number
+  categoryIds: number[]
+  tagIds: number[]
+}
+
+export interface CategorySubmitPayload {
+  level: number
+  name: string
+  code: string
+  parentId: number
+  iconUrl?: string
+  sortOrder?: number
+  status?: 0 | 1
+  description?: string
+}
+
+export interface TagSubmitPayload {
+  name: string
+  code: string
+  sortOrder?: number
+  status?: 0 | 1
+}
+
+export const getCategoryTree = () => {
+  return request.get('/knowledge/categories/tree')
+}
+
+export const addCategory = (data: CategorySubmitPayload) => {
+  return request.post('/knowledge/category', {
+    name: data.name,
+    code: data.code,
+    parentId: data.parentId,
+    iconUrl: data.iconUrl,
+    sortOrder: data.sortOrder,
+    status: data.status,
+    description: data.description,
+    level: data.level
   })
 }
 
-
-export const addCategory = (data: {
-  name: string
-  iconUrl?: string
-  sortOrder?: number
-  status?: 0 | 1
-  description?: string
-}) => {
-  const params = {
+export const updateCategory = (id: number, data: Partial<CategorySubmitPayload>) => {
+  return request.put(`/knowledge/category/${id}`, {
     name: data.name,
+    code: data.code,
+    parentId: data.parentId,
+    iconUrl: data.iconUrl,
+    sortOrder: data.sortOrder,
+    status: data.status,
     description: data.description,
-    icon_url: data.iconUrl,
-    sort_order: data.sortOrder,
-    status: data.status
-  }
-  return request.post('/knowledge/category', params)
-}
-
-export const updateCategory = (id: number, data: {
-  name?: string
-  iconUrl?: string
-  sortOrder?: number
-  status?: 0 | 1
-  description?: string
-}) => {
-  const params = {
-    name: data.name,
-    description: data.description,
-    icon_url: data.iconUrl,
-    sort_order: data.sortOrder,
-    status: data.status
-  }
-  return request.put(`/knowledge/category/${id}`, params)
+    level: data.level
+  })
 }
 
 export const deleteCategory = (id: number) => {
   return request.delete(`/knowledge/category/${id}`)
 }
 
-// ==================== 疾病相关接口 ====================
-export interface Disease {
-  id: number
-  name: string
-  alias?: string
-  categoryId?: number
-  categoryName?: string
-  introduction?: string
-  symptoms?: string
-  guidelines?: string
-  medications?: string
-  experiences?: string
-  images?: string[]
-  status: 0 | 1
-  creatorId?: number
-  createdAt?: string
-  updatedAt?: string
+export const getTagList = (params?: { keyword?: string; status?: number | null }) => {
+  return request.get('/knowledge/tags', { params })
 }
 
-// 修改：适配后端返回的详情数据结构
-export interface DiseaseDetailResponse {
-  code: number
-  data: {
-    name: string
-    alias?: string
-    introduction?: string
-    symptoms?: string
-    guidelines?: string
-    medications?: string
-    experiences?: string
-    images?: string[]
-  }
-  message: string
+export const addTag = (data: TagSubmitPayload) => {
+  return request.post('/knowledge/tag', {
+    name: data.name,
+    code: data.code,
+    sort_order: data.sortOrder,
+    status: data.status
+  })
 }
 
-export interface DiseaseListResponse {
-  code: number
-  data: {
-    list: Disease[]
-    total: number
-  }
-  message: string
+export const updateTag = (id: number, data: Partial<TagSubmitPayload>) => {
+  return request.put(`/knowledge/tag/${id}`, {
+    name: data.name,
+    code: data.code,
+    sort_order: data.sortOrder,
+    status: data.status
+  })
 }
 
-// ==================== 疾病相关接口 ====================
-// 修改：URL 改为 /knowledge/disease/:id（单数）
+export const deleteTag = (id: number) => {
+  return request.delete(`/knowledge/tag/${id}`)
+}
+
+export const getDiseaseList = (params: DiseaseListParams) => {
+  return request.get('/knowledge/diseases', { params })
+}
+
 export const getDiseaseDetail = (id: number) => {
-  return request.get<any, DiseaseDetailResponse>(`/knowledge/disease/${id}`)
+  return request.get(`/knowledge/disease/${id}`)
 }
 
-export const getDiseaseList = (params: {
-  page: number
-  pageSize: number
-  keyword?: string
-  status?: number | null
-  categoryId?: number | null
-  startDate?: string
-  endDate?: string
-}) => {
-  return request.get<any, DiseaseListResponse>('/knowledge/diseases', { params })
-}
-
-export const addDisease = (data: {
-  name: string
-  alias?: string
-  categoryId: number
-  introduction?: string
-  symptoms?: string
-  guidelines?: string
-  medications?: string
-  experiences?: string
-  images?: string[]
-  status: 0 | 1
-}) => {
-  // 转换为下划线命名
-  const params = {
+export const addDisease = (data: DiseaseSubmitPayload) => {
+  return request.post('/knowledge/disease', {
     name: data.name,
     alias: data.alias,
-    category_id: data.categoryId,
     introduction: data.introduction,
     symptoms: data.symptoms,
-    guidelines: data.guidelines,
-    medications: data.medications,
-    experiences: data.experiences,
     images: data.images,
-    status: data.status
-  }
-  return request.post('/knowledge/disease', params)
+    status: data.status,
+    primary_category_id: data.primaryCategoryId,
+    category_ids: data.categoryIds,
+    tag_ids: data.tagIds
+  })
 }
 
-export const updateDisease = (id: number, data: {
-  name?: string
-  alias?: string
-  categoryId?: number
-  introduction?: string
-  symptoms?: string
-  guidelines?: string
-  medications?: string
-  experiences?: string
-  images?: string[]
-  status?: 0 | 1
-}) => {
-  // 转换为下划线命名
-  const params = {
+export const updateDisease = (id: number, data: Partial<DiseaseSubmitPayload>) => {
+  return request.put(`/knowledge/disease/${id}`, {
     name: data.name,
     alias: data.alias,
-    category_id: data.categoryId,
     introduction: data.introduction,
     symptoms: data.symptoms,
-    guidelines: data.guidelines,
-    medications: data.medications,
-    experiences: data.experiences,
     images: data.images,
-    status: data.status
-  }
-  return request.put(`/knowledge/disease/${id}`, params)
+    status: data.status,
+    primary_category_id: data.primaryCategoryId,
+    category_ids: data.categoryIds,
+    tag_ids: data.tagIds
+  })
 }
 
 export const deleteDisease = (id: number) => {

@@ -18,14 +18,6 @@
           <p>康复机构资源维护</p>
         </el-card>
 
-        <!-- 康复设备管理 -->
-        <el-card class="module-card" @click="navigateTo('equipment')">
-          <div class="module-icon">
-            <el-icon :size="40"><Monitor /></el-icon>
-          </div>
-          <h3>康复设备管理</h3>
-          <p>康复设备资源维护</p>
-        </el-card>
 
         <!-- 康复训练指南 -->
         <el-card class="module-card" @click="navigateTo('rehabilitation-guide')">
@@ -34,15 +26,6 @@
           </div>
           <h3>康复训练指南</h3>
           <p>专业康复训练指导</p>
-        </el-card>
-
-        <!-- 居家护理手册 -->
-        <el-card class="module-card" @click="navigateTo('home-care-manual')">
-          <div class="module-icon">
-            <el-icon :size="40"><Reading /></el-icon>
-          </div>
-          <h3>居家护理手册</h3>
-          <p>居家护理知识指南</p>
         </el-card>
 
         <!-- 心理支持资源 -->

@@ -17,13 +17,6 @@
           <p>各类公益救助项目信息</p>
         </el-card>
 
-        <el-card class="module-card" @click="navigateTo('policy')">
-          <div class="module-icon">
-            <el-icon :size="40"><Document /></el-icon>
-          </div>
-          <h3>医保政策解读</h3>
-          <p>医保政策详细说明</p>
-        </el-card>
 
         <el-card class="module-card" @click="navigateTo('case')">
           <div class="module-icon">
@@ -47,7 +40,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { Wallet, Document, Notebook, Guide } from '@element-plus/icons-vue'
+import { Wallet, Notebook, Guide } from '@element-plus/icons-vue'
 
 const router = useRouter()
 

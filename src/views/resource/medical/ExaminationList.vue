@@ -1,75 +1,107 @@
-<!-- src/views/resource/medical/ExaminationList.vue -->
 <template>
   <div class="examination-list-page">
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>检查项目</span>
+          <div class="header-left">
+            <el-button link @click="handleBack" class="back-btn">
+              <el-icon><ArrowLeft /></el-icon>
+              返回医疗资源首页
+            </el-button>
+            <span class="page-title">检查手册</span>
+          </div>
+
           <el-button type="primary" @click="handleAdd">
             <el-icon><Plus /></el-icon>
-            新增项目
+            新增手册
           </el-button>
         </div>
       </template>
 
-      <!-- 筛选栏 -->
       <div class="filter-bar">
         <el-input
           v-model="filters.keyword"
-          placeholder="搜索项目名称"
+          placeholder="搜索检查名称/检查目的"
           clearable
-          style="width: 200px"
+          style="width: 240px"
+          @keyup.enter="handleSearch"
           @clear="handleSearch"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
-        
+
+        <!-- 修改 value 为后端接受的枚举值 (如 lab, genetic 等) -->
         <el-select
-          v-model="filters.type"
-          placeholder="项目类型"
+          v-model="filters.examType"
+          placeholder="检查类型"
           clearable
-          style="width: 150px"
+          style="width: 160px"
           @change="handleSearch"
         >
-          <el-option label="血液检查" value="血液检查" />
-          <el-option label="影像检查" value="影像检查" />
-          <el-option label="心电图" value="心电图" />
-          <el-option label="超声检查" value="超声检查" />
-          <el-option label="内镜检查" value="内镜检查" />
+          <el-option label="实验室检查" value="lab" />
+          <el-option label="代谢筛查" value="metabolic" />
+          <el-option label="影像学检查" value="imaging" />
+          <el-option label="基因检测" value="genetic" />
+          <el-option label="病理检查" value="pathology" />
+          <el-option label="功能检查" value="functional" />
+          <el-option label="量表评估" value="scale" />
+          <el-option label="专科专项检查" value="special" />
+          <el-option label="其他" value="other" />
         </el-select>
 
+        <!-- 修改 v-model 为 auditStatus 以保持一致性 -->
         <el-select
-          v-model="filters.status"
-          placeholder="状态"
+          v-model="filters.auditStatus"
+          placeholder="审核状态"
           clearable
-          style="width: 120px"
+          style="width: 140px"
           @change="handleSearch"
         >
-          <el-option label="启用" :value="1" />
-          <el-option label="停用" :value="0" />
+          <el-option label="待审核" :value="0" />
+          <el-option label="已通过" :value="1" />
+          <el-option label="已驳回" :value="2" />
         </el-select>
 
         <el-button type="primary" @click="handleSearch">查询</el-button>
         <el-button @click="handleReset">重置</el-button>
       </div>
 
-      <!-- 表格 -->
       <el-table :data="tableData" v-loading="loading">
-        <el-table-column prop="name" label="项目名称" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="type" label="项目类型" width="120" />
-        <el-table-column prop="price" label="价格（元）" width="100" align="right">
+        <el-table-column prop="examName" label="检查名称" min-width="220" show-overflow-tooltip />
+        <el-table-column prop="examType" label="检查类型" width="120">
+           <template #default="{ row }">
+             <!-- 可选：如果需要将英文枚举转回中文显示，可在此处添加映射逻辑 -->
+             {{ getExamTypeLabel(row.examType) }}
+           </template>
+        </el-table-column>
+        <el-table-column prop="examPurpose" label="检查目的" min-width="260" show-overflow-tooltip />
+        <el-table-column prop="institution" label="出具机构" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.price?.toFixed(2) || '-' }}
+            {{ row.institution || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="说明" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="80">
+        <el-table-column label="适用疾病数" width="110">
           <template #default="{ row }">
-            <el-tag :type="row.status === 1 ? 'success' : 'danger'">
-              {{ row.status === 1 ? '启用' : '停用' }}
+            {{ Array.isArray(row.diseaseIds) ? row.diseaseIds.length : 0 }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="sort" label="排序" width="90">
+          <template #default="{ row }">
+            {{ row.sort ?? '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="auditStatus" label="审核状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getAuditTagType(row.auditStatus)">
+              {{ getAuditText(row.auditStatus) }}
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createdAt" label="更新时间" width="180">
+          <template #default="{ row }">
+            {{ formatDate(row.createdAt) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="220" fixed="right">
@@ -81,20 +113,18 @@
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
       <div class="pagination-wrapper">
         <el-pagination
           v-model:current-page="pagination.currentPage"
           v-model:page-size="pagination.pageSize"
           :total="pagination.total"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSearch"
-          @current-change="handleSearch"
+          @size-change="loadData"
+          @current-change="loadData"
         />
       </div>
     </el-card>
 
-    <!-- 编辑/新增弹窗 -->
     <ExaminationDialog
       v-model="dialog.visible"
       :is-edit="dialog.isEdit"
@@ -102,7 +132,6 @@
       @submit="submitData"
     />
 
-    <!-- 详情查看弹窗 -->
     <ExaminationViewDialog
       v-model="viewDialog.visible"
       :data="viewDialog.data"
@@ -111,19 +140,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
-import { 
-  getExaminationList,
-  getExaminationDetail,
+import { ArrowLeft, Plus, Search } from '@element-plus/icons-vue'
+import {
   addExamination,
-  updateExamination,
-  deleteExamination
+  deleteExamination,
+  getExaminationDetail,
+  getExaminationList,
+  type ExaminationManualItem,
+  updateExamination
 } from '@/api/resource/medical/examination'
 import ExaminationDialog from './components/ExaminationDialog.vue'
 import ExaminationViewDialog from './components/ExaminationViewDialog.vue'
 
+const router = useRouter()
 const loading = ref(false)
 const tableData = ref<any[]>([])
 
@@ -133,10 +165,11 @@ const pagination = reactive({
   total: 0
 })
 
+// 修改 filters 的 key 为小驼峰，与后端参数保持一致，方便直接传递或映射
 const filters = reactive({
   keyword: '',
-  type: '',
-  status: null as number | null
+  examType: '',      // 对应后端 examType
+  auditStatus: null as number | null // 对应后端 auditStatus
 })
 
 const dialog = reactive({
@@ -150,9 +183,67 @@ const viewDialog = reactive({
   data: {} as any
 })
 
+// 辅助函数：将英文枚举转回中文显示（可选，根据需求决定是否需要）
+const getExamTypeLabel = (type?: string) => {
+  const map: Record<string, string> = {
+    'lab': '实验室检查',
+    'metabolic': '代谢筛查',
+    'imaging': '影像学检查',
+    'genetic': '基因检测',
+    'pathology': '病理检查',
+    'functional': '功能检查',
+    'scale': '量表评估',
+    'special': '专科专项检查',
+    'other': '其他'
+  }
+  return type ? (map[type] || type) : '-'
+}
+
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return '-'
+  const date = new Date(dateStr)
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+const getAuditText = (status?: number) => {
+  if (status === 1) return '已通过'
+  if (status === 2) return '已驳回'
+  return '待审核'
+}
+
+const getAuditTagType = (status?: number) => {
+  if (status === 1) return 'success'
+  if (status === 2) return 'danger'
+  return 'warning'
+}
+
+const handleBack = () => {
+  router.push('/resource/medical')
+}
+
 const handleAdd = () => {
   dialog.isEdit = false
-  dialog.data = { status: 1 }
+  // 初始化数据，注意这里要符合 ExaminationDialog 期望的小驼峰结构
+  dialog.data = {
+    id: 0,
+    examType: '',
+    examName: '',
+    examPurpose: '',
+    referenceValue: '',
+    abnormalInterpret: '',
+    sampleNotes: '',
+    institution: '',
+    templates: {
+      excel: '',
+      word: '',
+      compare: ''
+    },
+    auditStatus: 0,
+    rejectReason: '',
+    sort: 0,
+    diseaseIds: []
+  }
   dialog.visible = true
 }
 
@@ -161,7 +252,7 @@ const handleEdit = async (row: any) => {
     const res = await getExaminationDetail(row.id)
     if ((res as any).code === 200) {
       dialog.isEdit = true
-      dialog.data = { id: row.id, status: row.status, ...(res as any).data }
+      dialog.data = (res as any).data
       dialog.visible = true
     }
   } catch (error) {
@@ -182,11 +273,13 @@ const handleView = async (row: any) => {
 }
 
 const handleDelete = async (row: any) => {
-  await ElMessageBox.confirm(`确定要删除"${row.name}"吗？`, '提示', {
+  const name = row.examName || '该项'
+  await ElMessageBox.confirm(`确定要删除“${name}”吗？`, '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
   })
+
   try {
     await deleteExamination(row.id)
     ElMessage.success('删除成功')
@@ -198,14 +291,18 @@ const handleDelete = async (row: any) => {
 
 const submitData = async (formData: any) => {
   try {
-    if (dialog.isEdit && formData.id) {
+    if (formData.id && formData.id !== 0) {
       await updateExamination(formData.id, formData)
     } else {
-      await addExamination(formData)
+      const payload = { ...formData }
+      delete payload.id
+      await addExamination(payload)
     }
     ElMessage.success(dialog.isEdit ? '编辑成功' : '新增成功')
+    dialog.visible = false
     loadData()
   } catch (error) {
+    console.error(error)
     ElMessage.error('操作失败')
   }
 }
@@ -217,19 +314,25 @@ const handleSearch = () => {
 
 const handleReset = () => {
   filters.keyword = ''
-  filters.type = ''
-  filters.status = null
+  filters.examType = ''
+  filters.auditStatus = null
   handleSearch()
 }
 
 const loadData = async () => {
   loading.value = true
   try {
-    const res = await getExaminationList({
+    // 构造符合后端要求的参数：小驼峰命名
+    const params = {
       page: pagination.currentPage,
-      pageSize: pagination.pageSize,
-      ...filters
-    })
+      pageSize: pagination.pageSize, // 注意这里是 pageSize 而不是 page_size
+      keyword: filters.keyword || undefined,
+      examType: filters.examType || undefined, // 注意这里是 examType
+      auditStatus: filters.auditStatus // 注意这里是 auditStatus
+    }
+
+    const res = await getExaminationList(params as any)
+    
     if ((res as any).code === 200 && (res as any).data) {
       tableData.value = (res as any).data.list || []
       pagination.total = (res as any).data.total || 0
@@ -246,26 +349,43 @@ onMounted(() => {
 })
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .examination-list-page {
-  padding: 20px;
+  padding: 0;
+}
 
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 
-  .filter-bar {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 20px;
-  }
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
-  .pagination-wrapper {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 20px;
-  }
+.back-btn {
+  padding-left: 0;
+}
+
+.page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pagination-wrapper {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

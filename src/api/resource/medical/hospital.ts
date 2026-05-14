@@ -1,23 +1,6 @@
-// src/api/resource/medical/hospital.ts
+
 import request from '@/utils/request'
-
-export interface HospitalItem {
-  id: number | string
-  name: string
-  level: string
-  type: string
-  address: string
-  phone: string
-  status: number
-}
-
-export interface HospitalListParams {
-  page: number
-  pageSize: number
-  keyword?: string
-  level?: string
-  type?: string
-}
+import { getDiseaseList } from '@/api/knowledge/knowledge'
 
 export interface ApiResponse<T = any> {
   code: number
@@ -25,65 +8,160 @@ export interface ApiResponse<T = any> {
   message?: string
 }
 
-/**
- * 获取医院列表
- */
-export const getHospitalList = (params: HospitalListParams): Promise<ApiResponse<{ list: HospitalItem[]; total: number }>> => {
-  return request({
-    url: '/resource/medical/hospitals',
-    method: 'get',
-    params
-  })
+export interface DiseaseOption {
+  id: number
+  name: string
+  alias?: string
 }
 
-/**
- * 获取医院详情
- */
-export const getHospitalDetail = (id: number | string): Promise<ApiResponse<HospitalItem>> => {
-  return request({
-    url: `/resource/medical/hospitals/${id}`,
-    method: 'get'
-  })
+export interface HospitalItem {
+  id: number
+  name: string
+  provinceCode: string
+  provinceName: string
+  cityName: string
+  cityCode: string
+  districtName: string
+  districtCode: string
+  level: string
+  isRareNetwork: number
+  treatScope: string
+  address: string
+  phone: string
+  hospitalUrl: string
+  auditStatus: number
+  rejectReason: string
+  diseaseIds: number[]
+  diseases: DiseaseOption[]
+  diseaseCount?: number
+  createdAt?: string
+  updatedAt?: string
 }
 
-/**
- * 新增医院
- */
-export const addHospital = (data: Partial<HospitalItem>): Promise<ApiResponse> => {
-  return request({
-    url: '/resource/medical/hospitals',
-    method: 'post',
-    data
-  })
+export interface HospitalListParams {
+  page: number
+  pageSize: number
+  keyword?: string
+  level?: string
+  provinceCode?: string
+  cityCode?: string
+  districtCode?: string
+  isRareNetwork?: number | ''
+  auditStatus?: number | ''
 }
 
-/**
- * 更新医院
- */
-export const updateHospital = (id: number | string, data: Partial<HospitalItem>): Promise<ApiResponse> => {
-  return request({
-    url: `/resource/medical/hospitals/${id}`,
-    method: 'put',
-    data
-  })
+export interface HospitalForm {
+  id?: number
+  name: string
+  provinceCode: string
+  provinceName?: string
+  cityCode: string
+  cityName?: string
+  districtCode: string
+  districtName?: string
+  level: string
+  isRareNetwork: number
+  treatScope?: string
+  address: string
+  phone: string
+  hospitalUrl?: string
+  auditStatus: number
+  rejectReason?: string
+  diseaseIds: number[]
 }
 
-/**
- * 删除医院
- */
+const normalizeDisease = (item: any): DiseaseOption => ({
+  id: Number(item.id),
+  name: item.name,
+  alias: item.alias || ''
+})
+
+const normalizeHospital = (item: any): HospitalItem => ({
+  id: Number(item.id),
+  name: item.name || '',
+  provinceCode: item.provinceCode || '',
+  provinceName: item.provinceName || '',
+  cityCode: item.cityCode || '',
+  cityName: item.cityName || '',
+  districtCode: item.districtCode || '',
+  districtName: item.districtName || '',
+  level: String(item.level ?? ''),
+  isRareNetwork: Number(item.isRareNetwork ?? 0),
+  treatScope: item.treatScope || '',
+  address: item.address || '',
+  phone: item.phone || '',
+  hospitalUrl: item.hospitalUrl || '',
+  auditStatus: Number(item.auditStatus ?? 0),
+  rejectReason: item.rejectReason || '',
+  diseaseIds: (item.diseaseIds || []).map((v: number | string) => Number(v)),
+  diseases: (item.diseases || []).map(normalizeDisease),
+  diseaseCount: Number(item.diseases?.length ?? 0),
+  createdAt: item.createdAt || '',
+  updatedAt: item.updatedAt || '',
+})
+
+const toSubmitPayload = (data: HospitalForm) => ({
+  name: data.name,
+  provinceCode: data.provinceCode,
+  provinceName: data.provinceName,
+  cityCode: data.cityCode,
+  cityName: data.cityName,
+  districtCode: data.districtCode,
+  districtName: data.districtName || '',
+  level: data.level,
+  isRareNetwork: data.isRareNetwork,
+  treatScope: data.treatScope || '',
+  address: data.address,
+  phone: data.phone,
+  hospitalUrl: data.hospitalUrl || '',
+  auditStatus: data.auditStatus,
+  rejectReason: data.rejectReason || '',
+  diseaseIds: data.diseaseIds || [],
+})
+
+export const getHospitalList = async (params: HospitalListParams): Promise<ApiResponse<{ list: HospitalItem[]; total: number }>> => {
+  const res = await request.get('/resource/medical/hospitals', { params })
+  const payload = res.data || {}
+  return {
+    ...res,
+    data: {
+      list: (payload.list || []).map(normalizeHospital),
+      total: Number(payload.total || 0),
+    },
+  }
+}
+
+export const getHospitalDetail = async (id: number | string): Promise<ApiResponse<HospitalItem>> => {
+  const res = await request.get(`/resource/medical/hospitals/${id}`)
+  return {
+    ...res,
+    data: normalizeHospital(res.data || {}),
+  }
+}
+
+export const addHospital = (data: HospitalForm): Promise<ApiResponse> => {
+  return request.post('/resource/medical/hospitals', toSubmitPayload(data))
+}
+
+export const updateHospital = (id: number | string, data: HospitalForm): Promise<ApiResponse> => {
+  return request.put(`/resource/medical/hospitals/${id}`, toSubmitPayload(data))
+}
+
 export const deleteHospital = (id: number | string): Promise<ApiResponse> => {
-  return request({
-    url: `/resource/medical/hospitals/${id}`,
-    method: 'delete'
-  })
+  return request.delete(`/resource/medical/hospitals/${id}`)
 }
 
-/**
- * 获取医院列表（用于下拉选择，不分页）
- */
-export const getHospitalOptions = (): Promise<ApiResponse<HospitalItem[]>> => {
-  return request({
-    url: '/resource/medical/hospitals/options',
-    method: 'get'
+export const getHospitalOptions = async (keyword = ''): Promise<DiseaseOption[]> => {
+  const res = await request.get('/resource/medical/hospitals/options', { params: { keyword } })
+  return (res.data || []).map((item: any) => ({ id: Number(item.id), name: item.name }))
+}
+
+export const searchDiseaseOptions = async (keyword = ''): Promise<DiseaseOption[]> => {
+  const res: any = await getDiseaseList({
+    page: 1,
+    pageSize: 20,
+    keyword,
+    status: 1,
   })
+  return ((res.data?.list || []) as any[]).map(normalizeDisease)
 }

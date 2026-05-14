@@ -6,6 +6,7 @@
       <el-tab-pane label="用药信息平台" name="/resource/drug" />
       <el-tab-pane label="公益救助中心" name="/resource/charity" />
       <el-tab-pane label="康复支持专区" name="/resource/rehab" />
+      <el-tab-pane label="医保政策" name="/resource/medicare" />
     </el-tabs>
     <router-view />
   </div>

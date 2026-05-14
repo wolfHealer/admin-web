@@ -29,10 +29,21 @@
           <el-icon><ChatDotRound /></el-icon>
           <span>病友交流</span>
         </el-menu-item>
-        <el-menu-item index="/resource">
+        <el-menu-item index="/resource/medical">
           <el-icon><Download /></el-icon>
           <span>资源下载</span>
         </el-menu-item>
+        
+        <el-menu-item index="/user">
+          <el-icon><User /></el-icon>
+          <span>用户管理</span>
+        </el-menu-item>
+
+        <el-menu-item index="/region">
+          <el-icon><User /></el-icon>
+          <span>区域管理</span>
+        </el-menu-item>
+
       </el-menu>
     </el-aside>
 
