@@ -1,51 +1,46 @@
 import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
 import { getDiseaseList } from '@/api/knowledge/knowledge'
+import {
+  asNumber,
+  asString,
+  mapDetailResponse,
+  mapListResponse,
+  fromDisease,
+  normalizeDiseaseList,
+  normalizeIdList,
+  pickField,
+  type DiseaseOption,
+  type RawRecord,
+} from '@/api/resource/shared/normalize'
 
-// 1. 定义通用响应结构
-export interface ApiResponse<T = any> {
-  code: number
-  data: T
-  message?: string
-}
+export type { DiseaseOption }
 
-
-
-// 修改点：根据后端实际返回的 JSON 调整接口定义
 export interface RehabInstitutionItem {
   id: number
   name: string
   provinceCode: string
   cityCode: string
   districtCode: string
-  provinceName?: string // 后端返回了，保留
-  cityName?: string     // 后端返回了，保留
-  districtName?: string // 后端返回了，保留
-  address: string       // 后端返回了
-  contactPhone: string  // 后端返回了
-  contactUrl: string    // 后端返回了
-  qualification?: string // 后端返回了
-  rehabProjects?: string // 后端返回了
-  feeStandard?: string   // 后端返回了
-  
-  // 后端返回的是 diseaseIds 数组，没有直接返回 diseaseCount
-  diseaseIds?: number[] 
-  diseases?: DiseaseOption[] // 详情接口可能返回，列表接口通常只返回 IDs
-  
+  provinceName?: string
+  cityName?: string
+  districtName?: string
+  address: string
+  contactPhone: string
+  contactUrl: string
+  qualification?: string
+  rehabProjects?: string
+  feeStandard?: string
+  diseaseIds?: number[]
+  diseases?: DiseaseOption[]
   auditStatus: 0 | 1 | 2
   rejectReason?: string
-  
-  // 后端新增字段
   rating?: number
-  status?: string // 'active' etc.
-  
+  status?: string
   createdAt?: string
   updatedAt?: string
-  
-  // 前端计算属性或后端可能补充的字段
-  diseaseCount?: number 
+  diseaseCount?: number
 }
-
-
 
 export interface RehabInstitutionListParams {
   page: number
@@ -58,19 +53,24 @@ export interface RehabInstitutionListParams {
   diseaseId?: number | null
 }
 
-export interface RehabInstitutionListData {
-  list: RehabInstitutionItem[]
-  total: number
-  page?: number
-  pageSize?: number
-}
-
-
-
-export interface DiseaseOption {
-  id: number
+export interface RehabInstitutionForm {
+  id?: number
   name: string
-  alias?: string
+  provinceCode: string
+  cityCode: string
+  districtCode: string
+  provinceName?: string
+  cityName?: string
+  districtName?: string
+  address: string
+  contactPhone: string
+  contactUrl: string
+  qualification?: string
+  rehabProjects?: string
+  feeStandard?: string
+  diseaseIds?: number[]
+  auditStatus: number
+  rejectReason?: string
 }
 
 export interface RegionNode {
@@ -80,65 +80,84 @@ export interface RegionNode {
   children?: RegionNode[]
 }
 
-// ... 其他接口函数保持不变 ...
-export const getRehabInstitutionList = (params: RehabInstitutionListParams): Promise<ApiResponse<RehabInstitutionListData>> => {
-  return request({
-    url: '/resource/rehab/institutions',
-    method: 'get',
-    params,
-  })
+const normalizeRehabInstitution = (raw: RawRecord): RehabInstitutionItem => {
+  const diseases = normalizeDiseaseList(pickField(raw, 'diseases'))
+  const diseaseIds = normalizeIdList(pickField(raw, 'diseaseIds', 'disease_ids'))
+  return {
+    id: asNumber(raw.id),
+    name: asString(pickField(raw, 'name')),
+    provinceCode: asString(pickField(raw, 'provinceCode', 'province_code')),
+    cityCode: asString(pickField(raw, 'cityCode', 'city_code')),
+    districtCode: asString(pickField(raw, 'districtCode', 'district_code')),
+    provinceName: asString(pickField(raw, 'provinceName', 'province_name')),
+    cityName: asString(pickField(raw, 'cityName', 'city_name')),
+    districtName: asString(pickField(raw, 'districtName', 'district_name')),
+    address: asString(pickField(raw, 'address')),
+    contactPhone: asString(pickField(raw, 'contactPhone', 'contact_phone')),
+    contactUrl: asString(pickField(raw, 'contactUrl', 'contact_url')),
+    qualification: asString(pickField(raw, 'qualification')),
+    rehabProjects: asString(pickField(raw, 'rehabProjects', 'rehab_projects')),
+    feeStandard: asString(pickField(raw, 'feeStandard', 'fee_standard')),
+    diseaseIds: diseaseIds.length ? diseaseIds : diseases.map((d) => d.id),
+    diseases,
+    diseaseCount: diseases.length || diseaseIds.length,
+    auditStatus: asNumber(pickField(raw, 'auditStatus', 'audit_status')) as 0 | 1 | 2,
+    rejectReason: asString(pickField(raw, 'rejectReason', 'reject_reason')),
+    rating: asNumber(pickField(raw, 'rating')),
+    status: asString(pickField(raw, 'status')),
+    createdAt: asString(pickField(raw, 'createdAt', 'created_at')),
+    updatedAt: asString(pickField(raw, 'updatedAt', 'updated_at')),
+  }
 }
 
-export const getRehabInstitutionDetail = (id: number): Promise<ApiResponse<RehabInstitutionItem>> => {
-  return request({
-    url: `/resource/rehab/institutions/${id}`,
-    method: 'get',
-  })
+const toSubmitPayload = (data: RehabInstitutionForm) => ({
+  name: data.name,
+  provinceCode: data.provinceCode,
+  cityCode: data.cityCode,
+  districtCode: data.districtCode,
+  provinceName: data.provinceName || '',
+  cityName: data.cityName || '',
+  districtName: data.districtName || '',
+  address: data.address,
+  contactPhone: data.contactPhone,
+  contactUrl: data.contactUrl || '',
+  qualification: data.qualification || '',
+  rehabProjects: data.rehabProjects || '',
+  feeStandard: data.feeStandard || '',
+  diseaseIds: data.diseaseIds || [],
+  auditStatus: data.auditStatus,
+  rejectReason: data.rejectReason || '',
+})
+
+export const getRehabInstitutionList = async (
+  params: RehabInstitutionListParams
+): Promise<ApiResponse<{ list: RehabInstitutionItem[]; total: number }>> => {
+  const res = await request.get<{ list?: RawRecord[]; total?: number }>('/resource/rehab/institutions', { params })
+  return mapListResponse(res, normalizeRehabInstitution)
 }
 
-export const addRehabInstitution = (data: Partial<RehabInstitutionItem>): Promise<ApiResponse> => {
-  return request({
-    url: '/resource/rehab/institutions',
-    method: 'post',
-    data,
-  })
+export const getRehabInstitutionDetail = async (id: number): Promise<ApiResponse<RehabInstitutionItem>> => {
+  const res = await request.get<RawRecord>(`/resource/rehab/institutions/${id}`)
+  return mapDetailResponse(res, normalizeRehabInstitution)
 }
 
-export const updateRehabInstitution = (id: number, data: Partial<RehabInstitutionItem>): Promise<ApiResponse> => {
-  return request({
-    url: `/resource/rehab/institutions/${id}`,
-    method: 'put',
-    data,
-  })
+export const addRehabInstitution = (data: RehabInstitutionForm): Promise<ApiResponse<null>> => {
+  return request.post('/resource/rehab/institutions', toSubmitPayload(data))
 }
 
-export const deleteRehabInstitution = (id: number): Promise<ApiResponse> => {
-  return request({
-    url: `/resource/rehab/institutions/${id}`,
-    method: 'delete',
-  })
+export const updateRehabInstitution = (id: number, data: RehabInstitutionForm): Promise<ApiResponse<null>> => {
+  return request.put(`/resource/rehab/institutions/${id}`, toSubmitPayload(data))
+}
+
+export const deleteRehabInstitution = (id: number): Promise<ApiResponse<null>> => {
+  return request.delete(`/resource/rehab/institutions/${id}`)
 }
 
 export const getRegionTree = (): Promise<ApiResponse<RegionNode[]>> => {
-  return request({
-    url: '/region/tree',
-    method: 'get',
-  })
+  return request.get('/region/tree')
 }
 
 export async function searchDiseaseOptions(keyword: string): Promise<DiseaseOption[]> {
-  const res = await getDiseaseList({
-    page: 1,
-    pageSize: 20,
-    keyword,
-    status: 1,
-  })
-  // 注意：这里假设 getDiseaseList 返回的结构也需要适配，或者保持原有逻辑
-  // 如果 getDiseaseList 也返回 ApiResponse，则需要访问 res.data.list
-  const raw = (res as any)?.data?.list || []
-  return raw.map((item: any) => ({
-    id: item.id,
-    name: item.name,
-    alias: item.alias,
-  }))
+  const res = await getDiseaseList({ page: 1, pageSize: 20, keyword, status: 1 })
+  return (res.data?.list ?? []).map(fromDisease)
 }

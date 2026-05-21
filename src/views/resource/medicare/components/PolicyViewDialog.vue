@@ -33,11 +33,11 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import type { CharityPolicy } from '@/api/resource/charity/charity'
+import type { MedicarePolicy } from '@/api/resource/medicare/policy'
 
 interface Props {
   modelValue: boolean
-  data: CharityPolicy | null
+  data: MedicarePolicy | null
 }
 
 const props = withDefaults(defineProps<Props>(), {

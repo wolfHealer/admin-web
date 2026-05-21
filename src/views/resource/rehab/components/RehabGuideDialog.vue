@@ -176,10 +176,7 @@ const formRules: FormRules = {
 const loadDiseaseOptions = async (keyword = '') => {
   diseaseLoading.value = true
   try {
-    const res = await searchDiseaseOptions(keyword)
-    // 兼容不同的返回结构
-    const data = Array.isArray(res.data) ? res.data : res.data?.list || []
-    diseaseOptions.value = data
+    diseaseOptions.value = await searchDiseaseOptions(keyword)
   } finally {
     diseaseLoading.value = false
   }

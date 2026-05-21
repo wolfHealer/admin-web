@@ -1,10 +1,13 @@
 import request from '@/utils/request'
-
-export interface ApiResponse<T = any> {
-  code: number
-  data: T
-  message?: string
-}
+import type { ApiResponse } from '@/types/api'
+import {
+  asNumber,
+  asString,
+  mapDetailResponse,
+  mapListResponse,
+  pickField,
+  type RawRecord,
+} from '@/api/resource/shared/normalize'
 
 export type HelpChannelType =
   | 'emergency_help'
@@ -13,71 +16,97 @@ export type HelpChannelType =
   | 'foundation_support'
   | ''
 
-// 修改点：字段名改为小驼峰，与后端返回一致
 export interface HelpChannelItem {
   id: number
-  channelType: HelpChannelType // 原 channel_type
+  channelType: HelpChannelType
   name: string
-  applyCondition: string       // 原 apply_condition
-  responseTime: string         // 原 response_time
-  contactPhone?: string        // 原 contact_phone
-  contactUrl?: string          // 原 contact_url
-  helpLetterTemplate?: string  // 原 help_letter_template
-  crowdfundingTemplate?: string // 原 crowdfunding_template
-  auditStatus: 0 | 1 | 2       // 原 audit_status
-  rejectReason?: string        // 原 reject_reason
+  applyCondition: string
+  responseTime: string
+  contactPhone?: string
+  contactUrl?: string
+  helpLetterTemplate?: string
+  crowdfundingTemplate?: string
+  auditStatus: 0 | 1 | 2
+  rejectReason?: string
   sort: number
-  createdAt?: string           // 原 created_at
-  updatedAt?: string           // 原 updated_at
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface HelpChannelListParams {
   page: number
   pageSize: number
   keyword?: string
-  channelType?: HelpChannelType // 查询参数通常保持后端要求的格式，如果后端查询也支持小驼峰则需修改，这里假设查询参数仍用下划线或根据后端实际要求调整。根据常见习惯，GET参数有时混用，若后端报错需改为 channelType
-  auditStatus?: number | ''     // 同上
+  channelType?: HelpChannelType
+  auditStatus?: number | ''
 }
 
-export interface HelpChannelListResponse {
-  list: HelpChannelItem[]
-  total: number
+export interface HelpChannelForm {
+  id?: number
+  channelType: HelpChannelType
+  name: string
+  applyCondition: string
+  responseTime: string
+  contactPhone?: string
+  contactUrl?: string
+  helpLetterTemplate?: string
+  crowdfundingTemplate?: string
+  auditStatus: number
+  rejectReason?: string
+  sort: number
 }
 
-export const getHelpChannelList = (params: HelpChannelListParams) => {
-  return request<ApiResponse<HelpChannelListResponse>>({
-    url: '/resource/charity/channels',
-    method: 'get',
-    params,
-  })
+const normalizeHelpChannel = (raw: RawRecord): HelpChannelItem => ({
+  id: asNumber(raw.id),
+  channelType: asString(pickField(raw, 'channelType', 'channel_type')) as HelpChannelType,
+  name: asString(pickField(raw, 'name')),
+  applyCondition: asString(pickField(raw, 'applyCondition', 'apply_condition')),
+  responseTime: asString(pickField(raw, 'responseTime', 'response_time')),
+  contactPhone: asString(pickField(raw, 'contactPhone', 'contact_phone')),
+  contactUrl: asString(pickField(raw, 'contactUrl', 'contact_url')),
+  helpLetterTemplate: asString(pickField(raw, 'helpLetterTemplate', 'help_letter_template')),
+  crowdfundingTemplate: asString(pickField(raw, 'crowdfundingTemplate', 'crowdfunding_template')),
+  auditStatus: asNumber(pickField(raw, 'auditStatus', 'audit_status')) as 0 | 1 | 2,
+  rejectReason: asString(pickField(raw, 'rejectReason', 'reject_reason')),
+  sort: asNumber(pickField(raw, 'sort')),
+  createdAt: asString(pickField(raw, 'createdAt', 'created_at')),
+  updatedAt: asString(pickField(raw, 'updatedAt', 'updated_at')),
+})
+
+const toSubmitPayload = (data: HelpChannelForm) => ({
+  channelType: data.channelType,
+  name: data.name,
+  applyCondition: data.applyCondition,
+  responseTime: data.responseTime,
+  contactPhone: data.contactPhone || '',
+  contactUrl: data.contactUrl || '',
+  helpLetterTemplate: data.helpLetterTemplate || '',
+  crowdfundingTemplate: data.crowdfundingTemplate || '',
+  auditStatus: data.auditStatus,
+  rejectReason: data.rejectReason || '',
+  sort: data.sort,
+})
+
+export const getHelpChannelList = async (
+  params: HelpChannelListParams
+): Promise<ApiResponse<{ list: HelpChannelItem[]; total: number }>> => {
+  const res = await request.get<{ list?: RawRecord[]; total?: number }>('/resource/charity/channels', { params })
+  return mapListResponse(res, normalizeHelpChannel)
 }
 
-export const getHelpChannelDetail = (id: number) => {
-  return request<ApiResponse<HelpChannelItem>>({
-    url: `/resource/charity/channels/${id}`,
-    method: 'get',
-  })
+export const getHelpChannelDetail = async (id: number): Promise<ApiResponse<HelpChannelItem>> => {
+  const res = await request.get<RawRecord>(`/resource/charity/channels/${id}`)
+  return mapDetailResponse(res, normalizeHelpChannel)
 }
 
-export const addHelpChannel = (data: Partial<HelpChannelItem>) => {
-  return request<ApiResponse>({
-    url: '/resource/charity/channels',
-    method: 'post',
-    data,
-  })
+export const addHelpChannel = (data: HelpChannelForm): Promise<ApiResponse<null>> => {
+  return request.post('/resource/charity/channels', toSubmitPayload(data))
 }
 
-export const updateHelpChannel = (id: number, data: Partial<HelpChannelItem>) => {
-  return request<ApiResponse>({
-    url: `/resource/charity/channels/${id}`,
-    method: 'put',
-    data,
-  })
+export const updateHelpChannel = (id: number, data: HelpChannelForm): Promise<ApiResponse<null>> => {
+  return request.put(`/resource/charity/channels/${id}`, toSubmitPayload(data))
 }
 
-export const deleteHelpChannel = (id: number) => {
-  return request<ApiResponse>({
-    url: `/resource/charity/channels/${id}`,
-    method: 'delete',
-  })
+export const deleteHelpChannel = (id: number): Promise<ApiResponse<null>> => {
+  return request.delete(`/resource/charity/channels/${id}`)
 }

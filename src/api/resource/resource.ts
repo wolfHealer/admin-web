@@ -1,5 +1,6 @@
 // src/api/resource/resource.ts
 import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
 
 // 类型定义
 export interface ResourceItem {
@@ -24,11 +25,6 @@ export interface ResourceListResponse {
   total: number
 }
 
-export interface ApiResponse<T = any> {
-  code: number
-  data: T
-  message?: string
-}
 
 /**
  * 获取资源列表
@@ -69,7 +65,7 @@ export const getResourceDetail = (
 export const addResource = (
   module: string,
   data: Partial<ResourceItem>
-): Promise<ApiResponse> => {
+): Promise<ApiResponse<null>> => {
   return request({
     url: `/api/resource/${module}`,
     method: 'post',
@@ -87,7 +83,7 @@ export const updateResource = (
   module: string,
   id: string | number,
   data: Partial<ResourceItem>
-): Promise<ApiResponse> => {
+): Promise<ApiResponse<null>> => {
   return request({
     url: `/api/resource/${module}/${id}`,
     method: 'put',
@@ -103,7 +99,7 @@ export const updateResource = (
 export const deleteResource = (
   module: string,
   id: string | number
-): Promise<ApiResponse> => {
+): Promise<ApiResponse<null>> => {
   return request({
     url: `/api/resource/${module}/${id}`,
     method: 'delete'
@@ -122,6 +118,6 @@ export const downloadResource = (
   return request({
     url: `/api/resource/${module}/${id}/download`,
     method: 'get',
-    responseType: 'blob'
-  })
+    responseType: 'blob',
+  }) as unknown as Promise<Blob>
 }

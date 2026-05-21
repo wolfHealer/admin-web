@@ -45,7 +45,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
-import { ElMessage, UploadProps } from 'element-plus'
+import { ElMessage, type UploadFile, type UploadProps } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { createPost } from '@/api/community/post'
 
@@ -62,7 +62,7 @@ const emit = defineEmits<{
 const formRef = ref()
 const dialogVisible = ref(false)
 const submitting = ref(false)
-const fileList = ref([])
+const fileList = ref<UploadFile[]>([])
 
 const form = reactive({
   content: '',
@@ -90,11 +90,11 @@ watch(dialogVisible, (val) => {
   emit('update:modelValue', val)
 })
 
-const handleFileChange: UploadProps['onChange'] = (file, files) => {
+const handleFileChange: UploadProps['onChange'] = (_file, files) => {
   fileList.value = files
 }
 
-const handleRemove: UploadProps['onRemove'] = (file, files) => {
+const handleRemove: UploadProps['onRemove'] = (_file, files) => {
   fileList.value = files
 }
 

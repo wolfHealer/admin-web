@@ -11,7 +11,7 @@
             <span class="page-title">检查手册</span>
           </div>
 
-          <el-button type="primary" @click="handleAdd">
+          <el-button type="primary" @click="openAdd">
             <el-icon><Plus /></el-icon>
             新增手册
           </el-button>
@@ -20,7 +20,7 @@
 
       <div class="filter-bar">
         <el-input
-          v-model="filters.keyword"
+          v-model="query.keyword"
           placeholder="搜索检查名称/检查目的"
           clearable
           style="width: 240px"
@@ -32,9 +32,8 @@
           </template>
         </el-input>
 
-        <!-- 修改 value 为后端接受的枚举值 (如 lab, genetic 等) -->
         <el-select
-          v-model="filters.examType"
+          v-model="query.examType"
           placeholder="检查类型"
           clearable
           style="width: 160px"
@@ -51,9 +50,8 @@
           <el-option label="其他" value="other" />
         </el-select>
 
-        <!-- 修改 v-model 为 auditStatus 以保持一致性 -->
         <el-select
-          v-model="filters.auditStatus"
+          v-model="query.auditStatus"
           placeholder="审核状态"
           clearable
           style="width: 140px"
@@ -71,12 +69,15 @@
       <el-table :data="tableData" v-loading="loading">
         <el-table-column prop="examName" label="检查名称" min-width="220" show-overflow-tooltip />
         <el-table-column prop="examType" label="检查类型" width="120">
-           <template #default="{ row }">
-             <!-- 可选：如果需要将英文枚举转回中文显示，可在此处添加映射逻辑 -->
-             {{ getExamTypeLabel(row.examType) }}
-           </template>
+          <template #default="{ row }">
+            {{ getExamTypeLabel(row.examType) }}
+          </template>
         </el-table-column>
-        <el-table-column prop="examPurpose" label="检查目的" min-width="260" show-overflow-tooltip />
+        <el-table-column prop="examPurpose" label="检查目的" min-width="260" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.examPurpose || row.exam_purpose || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="institution" label="出具机构" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.institution || '-' }}
@@ -84,7 +85,7 @@
         </el-table-column>
         <el-table-column label="适用疾病数" width="110">
           <template #default="{ row }">
-            {{ Array.isArray(row.diseaseIds) ? row.diseaseIds.length : 0 }}
+            {{ Array.isArray(row.diseaseIds || row.disease_ids) ? (row.diseaseIds || row.disease_ids).length : 0 }}
           </template>
         </el-table-column>
         <el-table-column prop="sort" label="排序" width="90">
@@ -94,20 +95,20 @@
         </el-table-column>
         <el-table-column prop="auditStatus" label="审核状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="getAuditTagType(row.auditStatus)">
-              {{ getAuditText(row.auditStatus) }}
+            <el-tag :type="getAuditTagType(row.auditStatus ?? row.audit_status)">
+              {{ getAuditText(row.auditStatus ?? row.audit_status) }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="更新时间" width="180">
           <template #default="{ row }">
-            {{ formatDate(row.createdAt) }}
+            {{ formatDate(row.createdAt || row.created_at || row.updatedAt || row.updated_at) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleView(row)">查看</el-button>
-            <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+            <el-button link type="primary" @click="openView(row)">查看</el-button>
+            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -115,9 +116,9 @@
 
       <div class="pagination-wrapper">
         <el-pagination
-          v-model:current-page="pagination.currentPage"
-          v-model:page-size="pagination.pageSize"
-          :total="pagination.total"
+          v-model:current-page="query.page"
+          v-model:page-size="query.pageSize"
+          :total="total"
           layout="total, sizes, prev, pager, next, jumper"
           @size-change="loadData"
           @current-change="loadData"
@@ -126,9 +127,9 @@
     </el-card>
 
     <ExaminationDialog
-      v-model="dialog.visible"
-      :is-edit="dialog.isEdit"
-      :data="dialog.data"
+      v-model="editDialog.visible"
+      :is-edit="editDialog.isEdit"
+      :data="editDialog.data"
       @submit="submitData"
     />
 
@@ -140,63 +141,63 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { ArrowLeft, Plus, Search } from '@element-plus/icons-vue'
+import { useTable, useCrudDialog } from '@/composables'
 import {
   addExamination,
   deleteExamination,
   getExaminationDetail,
   getExaminationList,
   type ExaminationManualItem,
-  updateExamination
+  type ExaminationManualListParams,
+  updateExamination,
 } from '@/api/resource/medical/examination'
 import ExaminationDialog from './components/ExaminationDialog.vue'
 import ExaminationViewDialog from './components/ExaminationViewDialog.vue'
 
+type ExamRow = ExaminationManualItem
+
 const router = useRouter()
-const loading = ref(false)
-const tableData = ref<any[]>([])
 
-const pagination = reactive({
-  currentPage: 1,
-  pageSize: 10,
-  total: 0
+const { loading, tableData, total, query, loadData, handleSearch, handleReset, refresh } = useTable<
+  ExamRow,
+  ExaminationManualListParams
+>({
+  initialQuery: () => ({
+    page: 1,
+    pageSize: 10,
+    keyword: '',
+    examType: '',
+    auditStatus: null,
+  }),
+  fetchApi: async (params) => (await getExaminationList(params)).data,
+  errorMessage: '加载列表失败',
 })
 
-// 修改 filters 的 key 为小驼峰，与后端参数保持一致，方便直接传递或映射
-const filters = reactive({
-  keyword: '',
-  examType: '',      // 对应后端 examType
-  auditStatus: null as number | null // 对应后端 auditStatus
+const { editDialog, viewDialog, openAdd, openEdit, openView, handleDelete } = useCrudDialog<ExamRow>({
+  strategy: 'byData',
+  getRowId: (row) => row.id,
+  fetchDetail: async (id) => (await getExaminationDetail(id)).data,
+  deleteItem: (row) => deleteExamination(row.id),
+  deleteMessage: (row) => `确定要删除「${row.examName || '该项'}」吗？`,
+  onSuccess: refresh,
 })
 
-const dialog = reactive({
-  visible: false,
-  isEdit: false,
-  data: null as any
-})
-
-const viewDialog = reactive({
-  visible: false,
-  data: {} as any
-})
-
-// 辅助函数：将英文枚举转回中文显示（可选，根据需求决定是否需要）
 const getExamTypeLabel = (type?: string) => {
   const map: Record<string, string> = {
-    'lab': '实验室检查',
-    'metabolic': '代谢筛查',
-    'imaging': '影像学检查',
-    'genetic': '基因检测',
-    'pathology': '病理检查',
-    'functional': '功能检查',
-    'scale': '量表评估',
-    'special': '专科专项检查',
-    'other': '其他'
+    lab: '实验室检查',
+    metabolic: '代谢筛查',
+    imaging: '影像学检查',
+    genetic: '基因检测',
+    pathology: '病理检查',
+    functional: '功能检查',
+    scale: '量表评估',
+    special: '专科专项检查',
+    other: '其他',
   }
-  return type ? (map[type] || type) : '-'
+  return type ? map[type] || type : '-'
 }
 
 const formatDate = (dateStr?: string) => {
@@ -218,76 +219,7 @@ const getAuditTagType = (status?: number) => {
   return 'warning'
 }
 
-const handleBack = () => {
-  router.push('/resource/medical')
-}
-
-const handleAdd = () => {
-  dialog.isEdit = false
-  // 初始化数据，注意这里要符合 ExaminationDialog 期望的小驼峰结构
-  dialog.data = {
-    id: 0,
-    examType: '',
-    examName: '',
-    examPurpose: '',
-    referenceValue: '',
-    abnormalInterpret: '',
-    sampleNotes: '',
-    institution: '',
-    templates: {
-      excel: '',
-      word: '',
-      compare: ''
-    },
-    auditStatus: 0,
-    rejectReason: '',
-    sort: 0,
-    diseaseIds: []
-  }
-  dialog.visible = true
-}
-
-const handleEdit = async (row: any) => {
-  try {
-    const res = await getExaminationDetail(row.id)
-    if ((res as any).code === 200) {
-      dialog.isEdit = true
-      dialog.data = (res as any).data
-      dialog.visible = true
-    }
-  } catch (error) {
-    ElMessage.error('获取详情失败')
-  }
-}
-
-const handleView = async (row: any) => {
-  try {
-    const res = await getExaminationDetail(row.id)
-    if ((res as any).code === 200) {
-      viewDialog.data = (res as any).data
-      viewDialog.visible = true
-    }
-  } catch (error) {
-    ElMessage.error('获取详情失败')
-  }
-}
-
-const handleDelete = async (row: any) => {
-  const name = row.examName || '该项'
-  await ElMessageBox.confirm(`确定要删除“${name}”吗？`, '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  })
-
-  try {
-    await deleteExamination(row.id)
-    ElMessage.success('删除成功')
-    loadData()
-  } catch (error) {
-    ElMessage.error('删除失败')
-  }
-}
+const handleBack = () => router.push('/resource/medical')
 
 const submitData = async (formData: any) => {
   try {
@@ -298,55 +230,13 @@ const submitData = async (formData: any) => {
       delete payload.id
       await addExamination(payload)
     }
-    ElMessage.success(dialog.isEdit ? '编辑成功' : '新增成功')
-    dialog.visible = false
-    loadData()
-  } catch (error) {
-    console.error(error)
+    ElMessage.success(editDialog.value.isEdit ? '编辑成功' : '新增成功')
+    editDialog.value.visible = false
+    await refresh()
+  } catch {
     ElMessage.error('操作失败')
   }
 }
-
-const handleSearch = () => {
-  pagination.currentPage = 1
-  loadData()
-}
-
-const handleReset = () => {
-  filters.keyword = ''
-  filters.examType = ''
-  filters.auditStatus = null
-  handleSearch()
-}
-
-const loadData = async () => {
-  loading.value = true
-  try {
-    // 构造符合后端要求的参数：小驼峰命名
-    const params = {
-      page: pagination.currentPage,
-      pageSize: pagination.pageSize, // 注意这里是 pageSize 而不是 page_size
-      keyword: filters.keyword || undefined,
-      examType: filters.examType || undefined, // 注意这里是 examType
-      auditStatus: filters.auditStatus // 注意这里是 auditStatus
-    }
-
-    const res = await getExaminationList(params as any)
-    
-    if ((res as any).code === 200 && (res as any).data) {
-      tableData.value = (res as any).data.list || []
-      pagination.total = (res as any).data.total || 0
-    }
-  } catch (error) {
-    ElMessage.error('加载列表失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(() => {
-  loadData()
-})
 </script>
 
 <style scoped>

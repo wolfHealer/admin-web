@@ -37,35 +37,27 @@
       </el-table-column>
     </el-table>
 
-    <!-- 评论分页 -->
     <div class="pagination-wrapper" v-if="showPagination">
       <el-pagination
         v-model:current-page="currentPage"
         v-model:page-size="pageSize"
         :total="total"
         layout="total, prev, pager, next"
-        @current-change="handlePageChange"
+        @current-change="loadComments"
       />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCommentList, deleteComment, updateComment } from '@/api/community/post'
-
-export interface CommentItem {
-  id: number
-  postId: number
-  userId: number
-  displayName: string
-  content: string
-  likeCount: number
-  createdAt: string
-  parentId?: number
-  children?: CommentItem[]
-}
+import {
+  getCommentList,
+  deleteComment,
+  updateComment,
+  type CommentItem,
+} from '@/api/community/post'
 
 interface Props {
   postId: number
@@ -73,7 +65,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  showPagination: true
+  showPagination: true,
 })
 
 const emit = defineEmits<{
@@ -87,20 +79,17 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
-// 格式化时间
 const formatDateTime = (dateStr: string) => {
   if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleString('zh-CN', {
+  return new Date(dateStr).toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   })
 }
 
-// 加载评论列表
 const loadComments = async () => {
   if (!props.postId) return
   loading.value = true
@@ -109,14 +98,11 @@ const loadComments = async () => {
       postId: props.postId,
       page: currentPage.value,
       pageSize: pageSize.value,
-      keyword: keyword.value
+      keyword: keyword.value || undefined,
     })
-    if ((res as any).code === 200 && (res as any).data) {
-      commentData.value = (res as any).data || []
-      total.value = (res as any).data?.length || 0
-    }
-  } catch (error) {
-    console.error('加载评论失败:', error)
+    commentData.value = res.data.list
+    total.value = res.data.total
+  } catch {
     ElMessage.error('加载评论失败')
   } finally {
     loading.value = false
@@ -128,11 +114,6 @@ const handleSearch = () => {
   loadComments()
 }
 
-const handlePageChange = () => {
-  loadComments()
-}
-
-// 修改评论
 const handleEdit = async (row: CommentItem) => {
   const newContent = prompt('请输入新的评论内容:', row.content)
   if (!newContent || newContent === row.content) return
@@ -141,39 +122,39 @@ const handleEdit = async (row: CommentItem) => {
     ElMessage.success('修改成功')
     loadComments()
     emit('refresh')
-  } catch (error) {
+  } catch {
     ElMessage.error('修改失败')
   }
 }
 
-// 删除评论
 const handleDelete = async (row: CommentItem) => {
-  await ElMessageBox.confirm(`确定要删除该评论吗？`, '提示', {
+  await ElMessageBox.confirm('确定要删除该评论吗？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
-    type: 'warning'
+    type: 'warning',
   })
   try {
     await deleteComment(row.id)
     ElMessage.success('删除成功')
     loadComments()
     emit('refresh')
-  } catch (error) {
+  } catch {
     ElMessage.error('删除失败')
   }
 }
 
-// 监听 postId 变化，自动加载评论
-watch(() => props.postId, (val) => {
-  if (val) {
-    loadComments()
-  }
-}, { immediate: true })
+watch(
+  () => props.postId,
+  (val) => {
+    if (val) {
+      currentPage.value = 1
+      loadComments()
+    }
+  },
+  { immediate: true },
+)
 
-// 暴露刷新方法给父组件
-defineExpose({
-  refresh: loadComments
-})
+defineExpose({ refresh: loadComments })
 </script>
 
 <style lang="scss" scoped>

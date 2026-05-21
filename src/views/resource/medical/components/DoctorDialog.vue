@@ -157,7 +157,6 @@ import {
   getDiseaseOptions,
   getHospitalOptions,
   type DoctorDiseaseOption,
-  type DoctorSubmitPayload,
   type SimpleOption
 } from '@/api/resource/medical/doctor'
 
@@ -296,9 +295,7 @@ const handleDiseaseSearch = async (keyword: string) => {
   diseaseLoading.value = true
   try {
     const res = await getDiseaseOptions({ keyword })
-    console.log('Search Result:', res) // 【调试】检查返回值
-    
-    // 确保取到的是数组
+
     const remoteList = Array.isArray(res.data) ? res.data : []
     
     // 创建一个新的数组用于显示
@@ -332,8 +329,7 @@ const handleDiseaseSearch = async (keyword: string) => {
     })
 
     diseaseOptions.value = displayList
-  } catch (error) {
-    console.error('Search failed:', error)
+  } catch {
     diseaseOptions.value = []
   } finally {
     diseaseLoading.value = false

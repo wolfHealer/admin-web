@@ -50,7 +50,6 @@
                 v-model="queryParams.keyword"
                 placeholder="名称 / 编码"
                 clearable
-                @keyup.enter="handleSearch"
               />
             </el-form-item>
 
@@ -152,6 +151,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useDebouncedSearch } from '@/composables'
 import RegionDialog from './components/RegionDialog.vue'
 import RegionViewDialog from './components/RegionViewDialog.vue'
 import {
@@ -223,6 +223,11 @@ const handleSearch = () => {
   getList()
 }
 
+useDebouncedSearch(
+  () => [queryParams.keyword, queryParams.parentCode],
+  handleSearch
+)
+
 const handleReset = () => {
   queryParams.page = 1
   queryParams.pageSize = 10
@@ -247,15 +252,7 @@ const handleAdd = () => {
 
 const handleAddRoot = () => {
   currentId.value = null
-  currentParentRegion.value = {
-    code: '',
-    name: '',
-    fullName: '',
-    parentCode: '',
-    level: 0 as any,
-    sort: 0,
-    isEnabled: 1,
-  }
+  currentParentRegion.value = null
   dialogVisible.value = true
 }
 

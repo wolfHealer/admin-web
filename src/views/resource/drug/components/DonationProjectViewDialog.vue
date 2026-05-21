@@ -6,19 +6,15 @@
         <el-descriptions-item label="主办方">{{ viewData.organizer }}</el-descriptions-item>
         
         <!-- 【修改点1】显示药品名称 -->
-        <el-descriptions-item label="关联药品">{{ viewData.drugName || '-' }}</el-descriptions-item>
-        
-        <!-- 【修改点2】显示疾病名称 -->
+        <el-descriptions-item label="关联药品">{{ viewData.drugGenericName || viewData.drugBrandName || '-' }}</el-descriptions-item>
+
         <el-descriptions-item label="关联疾病">{{ viewData.diseaseName || '-' }}</el-descriptions-item>
-        
-        <!-- 适配 period (原 relief_cycle) -->
-        <el-descriptions-item label="援助周期">{{ viewData.period || '-' }}</el-descriptions-item>
-        
-        <!-- 适配 dosage (原 relief_dosage_desc) -->
-        <el-descriptions-item label="援助剂量说明">{{ viewData.dosage || '-' }}</el-descriptions-item>
-        
-        <!-- 适配 condition (原 apply_condition) -->
-        <el-descriptions-item label="申请条件" :span="2">{{ viewData.condition || '-' }}</el-descriptions-item>
+
+        <el-descriptions-item label="援助周期">{{ viewData.reliefCycle || '-' }}</el-descriptions-item>
+
+        <el-descriptions-item label="援助剂量说明">{{ viewData.reliefDosageDesc || '-' }}</el-descriptions-item>
+
+        <el-descriptions-item label="申请条件" :span="2">{{ viewData.applyCondition || '-' }}</el-descriptions-item>
         
         <el-descriptions-item label="进度查询" :span="2">{{ viewData.progressQuery || '-' }}</el-descriptions-item>
         
@@ -53,33 +49,11 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-
-// 【修改点3】更新类型定义以包含 drugName 和 diseaseName
-interface ProjectDetail {
-  id?: number;
-  name?: string;
-  organizer?: string;
-  drugId?: number;
-  drugName?: string;   // 新增
-  diseaseId?: number;
-  diseaseName?: string; // 新增
-  condition?: string;
-  period?: string;
-  dosage?: string;
-  applyForm?: string;
-  applyGuide?: string;
-  materialList?: string;
-  progressQuery?: string;
-  auditStatus?: number;
-  rejectReason?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  [key: string]: any;
-}
+import type { ReliefProjectItem } from '@/api/resource/drug/donationProject'
 
 interface Props {
   modelValue: boolean
-  viewData?: ProjectDetail | null
+  viewData?: ReliefProjectItem | null
 }
 
 const props = withDefaults(defineProps<Props>(), { viewData: null })

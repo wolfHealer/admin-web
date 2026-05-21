@@ -83,35 +83,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-
-// 定义与后端返回结构一致的接口类型
-interface DiseaseItem {
-  id: number
-  name: string
-  alias?: string
-}
-
-interface RareDrugItem {
-  id: number
-  genericName: string
-  brandName?: string
-  indication?: string
-  dosageForm?: string
-  spec?: string
-  refPrice?: string | number
-  drugType?: string
-  isInsurance?: boolean
-  hasRelief?: boolean
-  isLaunched?: boolean
-  needPrescription?: boolean
-  manualOriginal?: string
-  manualPopular?: string
-  diseases?: DiseaseItem[]
-  auditStatus?: number
-  rejectReason?: string
-  createdAt?: string
-  updatedAt?: string
-}
+import type { RareDrugItem } from '@/api/resource/drug/drug'
 
 interface Props {
   modelValue: boolean

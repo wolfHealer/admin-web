@@ -1,4 +1,3 @@
-<!-- src/views/resource/Resource.vue -->
 <template>
   <div class="resource-container">
     <el-tabs v-model="activeTab" @tab-change="handleTabChange">
@@ -13,20 +12,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+
+const RESOURCE_TABS = [
+  '/resource/medical',
+  '/resource/drug',
+  '/resource/charity',
+  '/resource/rehab',
+  '/resource/medicare',
+] as const
+
+/** 将任意 resource 子路径映射到对应 Tab 根路径 */
+const resolveResourceTab = (path: string): string => {
+  const matched = RESOURCE_TABS.find((tab) => path === tab || path.startsWith(`${tab}/`))
+  return matched ?? RESOURCE_TABS[0]
+}
 
 const router = useRouter()
 const route = useRoute()
-const activeTab = ref('/resource/medical')
+const activeTab = ref(resolveResourceTab(route.path))
+
+watch(
+  () => route.path,
+  (path) => {
+    activeTab.value = resolveResourceTab(path)
+  }
+)
 
 const handleTabChange = (path: string) => {
+  if (path === route.path) return
   router.push(path)
 }
-
-onMounted(() => {
-  activeTab.value = route.path
-})
 </script>
 
 <style lang="scss" scoped>

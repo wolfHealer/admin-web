@@ -258,7 +258,7 @@ const handleOpen = async () => {
       }
     } else {
       // 如果没有关联药品，重置为 undefined 或 0
-      formData.drugId = undefined
+      formData.drugId = 0
     }
 
   } else {

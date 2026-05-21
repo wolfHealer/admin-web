@@ -10,7 +10,7 @@
             </el-button>
             <span class="page-title">正规购药渠道</span>
           </div>
-          <el-button type="primary" @click="handleAdd">
+          <el-button type="primary" @click="openAdd">
             <el-icon><Plus /></el-icon>
             新增渠道
           </el-button>
@@ -18,11 +18,11 @@
       </template>
 
       <div class="filter-bar">
-        <el-input v-model="filters.keyword" placeholder="搜索渠道名称/联系方式" clearable style="width: 220px" @keyup.enter="handleSearch" @clear="handleSearch">
+        <el-input v-model="query.keyword" placeholder="搜索渠道名称/联系方式" clearable style="width: 220px" @keyup.enter="handleSearch" @clear="handleSearch">
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
 
-        <el-select v-model="filters.channelType" placeholder="渠道类型" clearable style="width: 150px" @change="handleSearch">
+        <el-select v-model="query.channelType" placeholder="渠道类型" clearable style="width: 150px" @change="handleSearch">
           <el-option label="医院药房" value="hospital_pharmacy" />
           <el-option label="连锁药店" value="retail_pharmacy" /> 
           <el-option label="互联网医院" value="internet_hospital" />
@@ -32,12 +32,12 @@
           <el-option label="其他" value="other" />
         </el-select>
 
-        <el-select v-model="filters.isInsuranceSettle" placeholder="医保结算" clearable style="width: 120px" @change="handleSearch">
+        <el-select v-model="query.isInsuranceSettle" placeholder="医保结算" clearable style="width: 120px" @change="handleSearch">
           <el-option label="是" :value="1" />
           <el-option label="否" :value="0" />
         </el-select>
 
-        <el-select v-model="filters.auditStatus" placeholder="审核状态" clearable style="width: 120px" @change="handleSearch">
+        <el-select v-model="query.auditStatus" placeholder="审核状态" clearable style="width: 120px" @change="handleSearch">
           <el-option label="待审核" :value="0" />
           <el-option label="已通过" :value="1" />
           <el-option label="已驳回" :value="2" />
@@ -53,7 +53,7 @@
         <!-- 修改点1: 列表接口未返回药品信息，暂时移除或显示占位符 -->
         <!-- 如果必须显示，需要后端在列表接口补充 drugName 字段 -->
         <el-table-column label="关联药品" min-width="180" show-overflow-tooltip>
-          <template #default="{ row }">
+          <template #default>
             <span style="color: #999;">详情中查看</span>
           </template>
         </el-table-column>
@@ -97,8 +97,8 @@
 
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleView(row)">查看</el-button>
-            <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+            <el-button link type="primary" @click="openView(row)">查看</el-button>
+            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -106,9 +106,9 @@
 
       <div class="pagination-wrapper">
         <el-pagination
-          v-model:current-page="pagination.currentPage"
-          v-model:page-size="pagination.pageSize"
-          :total="pagination.total"
+          v-model:current-page="query.page"
+          v-model:page-size="query.pageSize"
+          :total="total"
           layout="total, sizes, prev, pager, next, jumper"
           @size-change="loadData"
           @current-change="loadData"
@@ -116,16 +116,16 @@
       </div>
     </el-card>
 
-    <ChannelDialog v-model="dialog.visible" :edit-data="dialog.data" @submit="submitData" />
+    <ChannelDialog v-model="editDialog.visible" :edit-data="editDialog.data" @submit="submitData" />
     <ChannelViewDialog v-model="viewDialog.visible" :view-data="viewDialog.data" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { ArrowLeft, Plus, Search } from '@element-plus/icons-vue'
+import { useTable, useCrudDialog } from '@/composables'
 import ChannelDialog from './components/ChannelDialog.vue'
 import ChannelViewDialog from './components/ChannelViewDialog.vue'
 import {
@@ -135,24 +135,38 @@ import {
   getPurchaseChannelList,
   updatePurchaseChannel,
   type DrugChannelItem,
+  type DrugChannelListParams,
   type DrugChannelSubmitPayload,
 } from '@/api/resource/drug/channel'
 
-const router = useRouter()
-const loading = ref(false)
-// 使用 any[] 临时规避类型不一致问题，建议更新 API 类型定义
-const tableData = ref<any[]>([]) 
+type ChannelQuery = DrugChannelListParams
 
-const pagination = reactive({ currentPage: 1, pageSize: 10, total: 0 })
-const filters = reactive({
-  keyword: '',
-  channelType: '',
-  isInsuranceSettle: '' as number | '',
-  auditStatus: '' as number | ''
+const router = useRouter()
+
+const { loading, tableData, total, query, loadData, handleSearch, handleReset, refresh } = useTable<
+  DrugChannelItem,
+  ChannelQuery
+>({
+  initialQuery: () => ({
+    page: 1,
+    pageSize: 10,
+    keyword: '',
+    channelType: '',
+    isInsuranceSettle: '',
+    auditStatus: '',
+  }),
+  fetchApi: async (params) => (await getPurchaseChannelList(params)).data,
+  errorMessage: '加载列表失败',
 })
 
-const dialog = reactive({ visible: false, data: null as any })
-const viewDialog = reactive({ visible: false, data: null as any })
+const { editDialog, viewDialog, openAdd, openEdit, openView, handleDelete } = useCrudDialog<DrugChannelItem>({
+  strategy: 'byData',
+  getRowId: (row) => row.id,
+  fetchDetail: async (id) => (await getPurchaseChannelDetail(id)).data,
+  deleteItem: (row) => deletePurchaseChannel(row.id),
+  deleteMessage: (row) => `确定要删除「${row.name}」吗？`,
+  onSuccess: refresh,
+})
 
 const handleBack = () => router.push('/resource/drug')
 
@@ -174,61 +188,26 @@ const getChannelTypeText = (value: string) => {
 const getAuditTag = (status: number) => ({ 0: 'warning', 1: 'success', 2: 'danger' } as Record<number, string>)[status] || 'info'
 const getAuditText = (status: number) => ({ 0: '待审核', 1: '已通过', 2: '已驳回' } as Record<number, string>)[status] || '-'
 
-// 修改点4: 格式化区域，由于接口返回的 Name 也是 Code，这里暂时显示 Code，或者你可以选择只显示 Province
-const formatRegion = (row: any) => {
-  // 如果后端返回的 provinceName 是 "110000" 这种代码，显示出来意义不大
-  // 建议：如果后端不改，前端可以只显示 Province Code 或者尝试映射（如果有地区字典）
-  // 这里暂时按原逻辑拼接，但你会看到类似 "110000 / 110100 / 110101" 的结果
-  return [row.provinceName, row.cityName, row.districtName].filter(Boolean).join(' / ') || '-'
-}
+const formatRegion = (row: DrugChannelItem) =>
+  [row.provinceName, row.cityName, row.districtName].filter(Boolean).join(' / ') || '-'
 
-// 新增日期格式化
 const formatDate = (dateStr: string) => {
-  if (!dateStr) return '-';
+  if (!dateStr) return '-'
   try {
-    const date = new Date(dateStr);
-    return date.toLocaleString('zh-CN', { 
-      year: 'numeric', month: '2-digit', day: '2-digit', 
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false 
-    }).replace(/\//g, '-');
-  } catch (e) {
-    return dateStr;
-  }
-}
-
-const handleAdd = () => {
-  dialog.data = null
-  dialog.visible = true
-}
-
-const handleEdit = async (row: any) => {
-  try {
-    const res = await getPurchaseChannelDetail(row.id)
-    dialog.data = res.data
-    dialog.visible = true
+    const date = new Date(dateStr)
+    return date
+      .toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      })
+      .replace(/\//g, '-')
   } catch {
-    ElMessage.error('获取详情失败')
-  }
-}
-
-const handleView = async (row: any) => {
-  try {
-    const res = await getPurchaseChannelDetail(row.id)
-    viewDialog.data = res.data
-    viewDialog.visible = true
-  } catch {
-    ElMessage.error('获取详情失败')
-  }
-}
-
-const handleDelete = async (row: any) => {
-  await ElMessageBox.confirm(`确定要删除“${row.name}”吗？`, '提示', { type: 'warning' })
-  try {
-    await deletePurchaseChannel(row.id)
-    ElMessage.success('删除成功')
-    loadData()
-  } catch {
-    ElMessage.error('删除失败')
+    return dateStr
   }
 }
 
@@ -241,46 +220,13 @@ const submitData = async (payload: DrugChannelSubmitPayload & { id?: number }) =
       await addPurchaseChannel(payload)
     }
     ElMessage.success(payload.id ? '编辑成功' : '新增成功')
-    dialog.visible = false
-    dialog.data = null
-    loadData()
+    editDialog.value.visible = false
+    editDialog.value.data = null
+    await refresh()
   } catch {
     ElMessage.error('操作失败')
   }
 }
-
-const handleSearch = () => {
-  pagination.currentPage = 1
-  loadData()
-}
-
-const handleReset = () => {
-  filters.keyword = ''
-  filters.channelType = ''
-  filters.isInsuranceSettle = ''
-  filters.auditStatus = ''
-  handleSearch()
-}
-
-const loadData = async () => {
-  loading.value = true
-  try {
-    const res = await getPurchaseChannelList({
-      page: pagination.currentPage,
-      pageSize: pagination.pageSize,
-      ...filters
-    })
-    // 适配接口返回结构
-    tableData.value = (res as any).data?.list || []
-    pagination.total = (res as any).data?.total || 0
-  } catch {
-    ElMessage.error('加载列表失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(loadData)
 </script>
 
 <style scoped>

@@ -1,104 +1,136 @@
 import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
+import { getDiseaseList } from '@/api/knowledge/knowledge'
+import {
+  asNumber,
+  asString,
+  mapDetailResponse,
+  mapListResponse,
+  fromDisease,
+  normalizeDiseaseList,
+  normalizeIdList,
+  pickField,
+  type DiseaseOption,
+  type RawRecord,
+} from '@/api/resource/shared/normalize'
 
-export interface ApiResponse<T = any> {
-  code: number
-  data: T
-  message?: string
-}
+export type { DiseaseOption }
 
-// 修改点：字段名改为小驼峰，与后端返回一致
 export interface RehabTrainGuideItem {
   id: number
-  rehabStage: string        // 原 rehab_stage
+  rehabStage: string
   title: string
-  trainPurpose: string      // 原 train_purpose
-  trainContent: string      // 原 train_content
-  forbiddenAction: string   // 原 forbidden_action
-  picUrls?: string[]        // 原 pic_urls
-  guidePdf?: string         // 原 guide_pdf
-  guideWord?: string        // 原 guide_word
-  auditStatus: 0 | 1 | 2    // 原 audit_status
-  rejectReason?: string     // 原 reject_reason
+  trainPurpose: string
+  trainContent: string
+  forbiddenAction: string
+  picUrls?: string[]
+  guidePdf?: string
+  guideWord?: string
+  auditStatus: 0 | 1 | 2
+  rejectReason?: string
   sort?: number
-  diseaseIds?: number[]     // 原 disease_ids
-  diseases?: Array<{ id: number; name: string; alias?: string }>
-  diseaseCount?: number     // 原 disease_count
-  createdAt?: string        // 原 created_at
-  updatedAt?: string        // 原 updated_at
+  diseaseIds?: number[]
+  diseases?: DiseaseOption[]
+  diseaseCount?: number
+  createdAt?: string
+  updatedAt?: string
 }
 
-// 注意：GET 请求的参数命名风格需与后端保持一致。
-// 如果后端 GET 参数依然要求下划线（如 page_size），请保留下划线。
-// 如果后端 GET 参数也改为小驼峰（如 pageSize），请修改此处。
-// 根据常见 RESTful 习惯，有时 URL Params 和 Body 风格不同。
-// 这里假设后端 URL Params 也接受小驼峰，如果不行请改回 page_size, rehab_stage 等
 export interface RehabTrainGuideListParams {
   page: number
-  pageSize: number          // 原 page_size
+  pageSize: number
   keyword?: string
-  rehabStage?: string       // 原 rehab_stage
-  auditStatus?: number | '' // 原 audit_status
-  diseaseId?: number | ''   // 原 disease_id
+  rehabStage?: string
+  auditStatus?: number | ''
+  diseaseId?: number | ''
 }
 
-export interface RehabTrainGuideListResponse {
-  list: RehabTrainGuideItem[]
-  total: number
+export interface RehabTrainGuideForm {
+  id?: number
+  rehabStage: string
+  title: string
+  trainPurpose: string
+  trainContent: string
+  forbiddenAction: string
+  picUrls?: string[]
+  guidePdf?: string
+  guideWord?: string
+  auditStatus: number
+  rejectReason?: string
+  sort?: number
+  diseaseIds?: number[]
 }
 
-export interface DiseaseOption {
-  id: number
-  name: string
-  alias?: string
+const normalizePicUrls = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value.map((v) => asString(v)).filter(Boolean)
+  if (typeof value === 'string' && value) return [value]
+  return []
 }
 
-export const getRehabTrainGuideList = (params: RehabTrainGuideListParams) => {
-  return request<ApiResponse<RehabTrainGuideListResponse>>({
-    url: '/resource/rehab/trainings',
-    method: 'get',
-    params,
-  })
+const normalizeRehabTrainGuide = (raw: RawRecord): RehabTrainGuideItem => {
+  const diseases = normalizeDiseaseList(pickField(raw, 'diseases'))
+  const diseaseIds = normalizeIdList(pickField(raw, 'diseaseIds', 'disease_ids'))
+  return {
+    id: asNumber(raw.id),
+    rehabStage: asString(pickField(raw, 'rehabStage', 'rehab_stage')),
+    title: asString(pickField(raw, 'title')),
+    trainPurpose: asString(pickField(raw, 'trainPurpose', 'train_purpose')),
+    trainContent: asString(pickField(raw, 'trainContent', 'train_content')),
+    forbiddenAction: asString(pickField(raw, 'forbiddenAction', 'forbidden_action')),
+    picUrls: normalizePicUrls(pickField(raw, 'picUrls', 'pic_urls')),
+    guidePdf: asString(pickField(raw, 'guidePdf', 'guide_pdf')),
+    guideWord: asString(pickField(raw, 'guideWord', 'guide_word')),
+    auditStatus: asNumber(pickField(raw, 'auditStatus', 'audit_status')) as 0 | 1 | 2,
+    rejectReason: asString(pickField(raw, 'rejectReason', 'reject_reason')),
+    sort: asNumber(pickField(raw, 'sort')),
+    diseaseIds: diseaseIds.length ? diseaseIds : diseases.map((d) => d.id),
+    diseases,
+    diseaseCount: diseases.length || diseaseIds.length,
+    createdAt: asString(pickField(raw, 'createdAt', 'created_at')),
+    updatedAt: asString(pickField(raw, 'updatedAt', 'updated_at')),
+  }
 }
 
-export const getRehabTrainGuideDetail = (id: number) => {
-  return request<ApiResponse<RehabTrainGuideItem>>({
-    url: `/resource/rehab/trainings/${id}`,
-    method: 'get',
-  })
+const toSubmitPayload = (data: RehabTrainGuideForm) => ({
+  rehabStage: data.rehabStage,
+  title: data.title,
+  trainPurpose: data.trainPurpose,
+  trainContent: data.trainContent,
+  forbiddenAction: data.forbiddenAction,
+  picUrls: data.picUrls || [],
+  guidePdf: data.guidePdf || '',
+  guideWord: data.guideWord || '',
+  auditStatus: data.auditStatus,
+  rejectReason: data.rejectReason || '',
+  sort: data.sort ?? 0,
+  diseaseIds: data.diseaseIds || [],
+})
+
+export const getRehabTrainGuideList = async (
+  params: RehabTrainGuideListParams
+): Promise<ApiResponse<{ list: RehabTrainGuideItem[]; total: number }>> => {
+  const res = await request.get<{ list?: RawRecord[]; total?: number }>('/resource/rehab/trainings', { params })
+  return mapListResponse(res, normalizeRehabTrainGuide)
 }
 
-export const addRehabTrainGuide = (data: Partial<RehabTrainGuideItem>) => {
-  return request<ApiResponse>({
-    url: '/resource/rehab/trainings',
-    method: 'post',
-    data,
-  })
+export const getRehabTrainGuideDetail = async (id: number): Promise<ApiResponse<RehabTrainGuideItem>> => {
+  const res = await request.get<RawRecord>(`/resource/rehab/trainings/${id}`)
+  return mapDetailResponse(res, normalizeRehabTrainGuide)
 }
 
-export const updateRehabTrainGuide = (id: number, data: Partial<RehabTrainGuideItem>) => {
-  return request<ApiResponse>({
-    url: `/resource/rehab/trainings/${id}`,
-    method: 'put',
-    data,
-  })
+export const addRehabTrainGuide = (data: RehabTrainGuideForm): Promise<ApiResponse<null>> => {
+  return request.post('/resource/rehab/trainings', toSubmitPayload(data))
 }
 
-export const deleteRehabTrainGuide = (id: number) => {
-  return request<ApiResponse>({
-    url: `/resource/rehab/trainings/${id}`,
-    method: 'delete',
-  })
+export const updateRehabTrainGuide = (id: number, data: RehabTrainGuideForm): Promise<ApiResponse<null>> => {
+  return request.put(`/resource/rehab/trainings/${id}`, toSubmitPayload(data))
 }
 
-export const searchDiseaseOptions = (keyword = '') => {
-  return request<ApiResponse<{ list: DiseaseOption[] } | DiseaseOption[]>>({
-    url: '/knowledge/diseases',
-    method: 'get',
-    params: {
-      page: 1,
-      pageSize: 20,
-      keyword,
-      status: 1,
-    },
-  })
+export const deleteRehabTrainGuide = (id: number): Promise<ApiResponse<null>> => {
+  return request.delete(`/resource/rehab/trainings/${id}`)
+}
+
+export const searchDiseaseOptions = async (keyword = ''): Promise<DiseaseOption[]> => {
+  const res = await getDiseaseList({ page: 1, pageSize: 20, keyword, status: 1 })
+  return (res.data?.list ?? []).map(fromDisease)
 }

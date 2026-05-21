@@ -12,7 +12,7 @@
             <span class="page-title">罕见病药品名录</span>
           </div>
 
-          <el-button type="primary" @click="handleAdd">
+          <el-button type="primary" @click="openAdd">
             <el-icon><Plus /></el-icon>
             新增药品
           </el-button>
@@ -21,7 +21,7 @@
 
       <div class="filter-bar">
         <el-input
-          v-model="filters.keyword"
+          v-model="query.keyword"
           placeholder="搜索通用名 / 商品名"
           clearable
           style="width: 220px"
@@ -33,24 +33,24 @@
           </template>
         </el-input>
 
-        <el-select v-model="filters.drugType" placeholder="药品类型" clearable style="width: 160px" @change="handleSearch">
+        <el-select v-model="query.drugType" placeholder="药品类型" clearable style="width: 160px" @change="handleSearch">
           <el-option label="原研进口" value="origin_import" />
           <el-option label="原研国产" value="origin_domestic" />
           <el-option label="仿制药" value="generic" />
           <el-option label="其他" value="other" />
         </el-select>
 
-        <el-select v-model="filters.isInsurance" placeholder="是否医保" clearable style="width: 130px" @change="handleSearch">
+        <el-select v-model="query.isInsurance" placeholder="是否医保" clearable style="width: 130px" @change="handleSearch">
           <el-option label="是" :value="1" />
           <el-option label="否" :value="0" />
         </el-select>
 
-        <el-select v-model="filters.hasRelief" placeholder="是否援助" clearable style="width: 130px" @change="handleSearch">
+        <el-select v-model="query.hasRelief" placeholder="是否援助" clearable style="width: 130px" @change="handleSearch">
           <el-option label="是" :value="1" />
           <el-option label="否" :value="0" />
         </el-select>
 
-        <el-select v-model="filters.auditStatus" placeholder="审核状态" clearable style="width: 130px" @change="handleSearch">
+        <el-select v-model="query.auditStatus" placeholder="审核状态" clearable style="width: 130px" @change="handleSearch">
           <el-option label="待审核" :value="0" />
           <el-option label="已通过" :value="1" />
           <el-option label="已驳回" :value="2" />
@@ -94,8 +94,8 @@
         <el-table-column prop="updated_at" label="更新时间" width="180" />
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleView(row)">查看</el-button>
-            <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+            <el-button link type="primary" @click="openView(row)">查看</el-button>
+            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -103,26 +103,26 @@
 
       <div class="pagination-wrapper">
         <el-pagination
-          v-model:current-page="pagination.currentPage"
-          v-model:page-size="pagination.pageSize"
-          :total="pagination.total"
+          v-model:current-page="query.page"
+          v-model:page-size="query.pageSize"
+          :total="total"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSearch"
+          @size-change="loadData"
           @current-change="loadData"
         />
       </div>
     </el-card>
 
-    <DrugDialog v-model="dialog.visible" :edit-data="dialog.data" @submit="submitData" />
+    <DrugDialog v-model="editDialog.visible" :drug-item="editDialog.data" @submit="submitData" />
     <DrugViewDialog v-model="viewDialog.visible" :view-data="viewDialog.data" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Plus, Search } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { useTable, useCrudDialog } from '@/composables'
 import DrugDialog from './components/DrugDialog.vue'
 import DrugViewDialog from './components/DrugViewDialog.vue'
 import {
@@ -132,35 +132,38 @@ import {
   getRareDrugList,
   updateRareDrug,
   type RareDrugItem,
+  type RareDrugListParams,
   type RareDrugSubmitPayload,
 } from '@/api/resource/drug/drug'
 
+type DrugQuery = RareDrugListParams
+
 const router = useRouter()
-const loading = ref(false)
-const tableData = ref<RareDrugItem[]>([])
 
-const pagination = reactive({
-  currentPage: 1,
-  pageSize: 10,
-  total: 0,
+const { loading, tableData, total, query, loadData, handleSearch, handleReset, refresh } = useTable<
+  RareDrugItem,
+  DrugQuery
+>({
+  initialQuery: () => ({
+    page: 1,
+    pageSize: 10,
+    keyword: '',
+    drugType: '',
+    isInsurance: '',
+    hasRelief: '',
+    auditStatus: '',
+  }),
+  fetchApi: async (params) => (await getRareDrugList(params)).data,
+  errorMessage: '加载药品列表失败',
 })
 
-const filters = reactive({
-  keyword: '',
-  drugType: '',
-  isInsurance: '' as '' | number,
-  hasRelief: '' as '' | number,
-  auditStatus: '' as '' | number,
-})
-
-const dialog = reactive({
-  visible: false,
-  data: null as RareDrugItem | null,
-})
-
-const viewDialog = reactive({
-  visible: false,
-  data: null as RareDrugItem | null,
+const { editDialog, viewDialog, openAdd, openEdit, openView, handleDelete } = useCrudDialog<RareDrugItem>({
+  strategy: 'byData',
+  getRowId: (row) => row.id,
+  fetchDetail: async (id) => (await getRareDrugDetail(id)).data,
+  deleteItem: (row) => deleteRareDrug(row.id),
+  deleteMessage: (row) => `确定删除「${row.genericName}」吗？`,
+  onSuccess: refresh,
 })
 
 const handleBack = () => {
@@ -195,84 +198,6 @@ const getAuditStatusTag = (status: number) => {
   return ['warning', 'success', 'danger'][status] || 'info'
 }
 
-const loadData = async () => {
-  loading.value = true
-  try {
-    const res = await getRareDrugList({
-      page: pagination.currentPage,
-      pageSize: pagination.pageSize,
-      ...filters,
-    })
-    if ((res as any).code === 200) {
-      tableData.value = (res as any).data?.list || []
-      pagination.total = (res as any).data?.total || 0
-    }
-  } catch (error) {
-    ElMessage.error('加载药品列表失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-const handleSearch = () => {
-  pagination.currentPage = 1
-  loadData()
-}
-
-const handleReset = () => {
-  filters.keyword = ''
-  filters.drugType = ''
-  filters.isInsurance = ''
-  filters.hasRelief = ''
-  filters.auditStatus = ''
-  handleSearch()
-}
-
-const handleAdd = () => {
-  dialog.data = null
-  dialog.visible = true
-}
-
-const handleEdit = async (row: RareDrugItem) => {
-  try {
-    const res = await getRareDrugDetail(row.id)
-    if ((res as any).code === 200) {
-      dialog.data = (res as any).data
-      dialog.visible = true
-    }
-  } catch (error) {
-    ElMessage.error('获取药品详情失败')
-  }
-}
-
-const handleView = async (row: RareDrugItem) => {
-  try {
-    const res = await getRareDrugDetail(row.id)
-    if ((res as any).code === 200) {
-      viewDialog.data = (res as any).data
-      viewDialog.visible = true
-    }
-  } catch (error) {
-    ElMessage.error('获取药品详情失败')
-  }
-}
-
-const handleDelete = async (row: RareDrugItem) => {
-  await ElMessageBox.confirm(`确定删除“${row.genericName}”吗？`, '提示', {
-    type: 'warning',
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-  })
-
-  try {
-    await deleteRareDrug(row.id)
-    ElMessage.success('删除成功')
-    loadData()
-  } catch (error) {
-    ElMessage.error('删除失败')
-  }
-}
-
 const submitData = async (payload: RareDrugSubmitPayload & { id?: number }) => {
   try {
     if (payload.id) {
@@ -282,17 +207,13 @@ const submitData = async (payload: RareDrugSubmitPayload & { id?: number }) => {
       await addRareDrug(payload)
     }
     ElMessage.success(payload.id ? '编辑成功' : '新增成功')
-    dialog.visible = false
-    dialog.data = null
-    loadData()
-  } catch (error) {
+    editDialog.value.visible = false
+    editDialog.value.data = null
+    await refresh()
+  } catch {
     ElMessage.error('保存失败')
   }
 }
-
-onMounted(() => {
-  loadData()
-})
 </script>
 
 <style lang="scss" scoped>

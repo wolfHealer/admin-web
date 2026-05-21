@@ -95,7 +95,7 @@ import {
   addHelpChannel,
   getHelpChannelDetail,
   updateHelpChannel,
-  type HelpChannelItem,
+  type HelpChannelForm,
 } from '@/api/resource/charity/helpChannel'
 
 const props = defineProps<{
@@ -112,8 +112,7 @@ const formRef = ref<FormInstance>()
 const saving = ref(false)
 
 // 修改点：默认值对象中的键名改为小驼峰
-const getDefaultForm = (): Partial<HelpChannelItem> => ({
-  id: undefined,
+const getDefaultForm = (): HelpChannelForm => ({
   channelType: '',
   name: '',
   applyCondition: '',
@@ -127,7 +126,7 @@ const getDefaultForm = (): Partial<HelpChannelItem> => ({
   sort: 0,
 })
 
-const form = reactive<Partial<HelpChannelItem>>(getDefaultForm())
+const form = reactive<HelpChannelForm>(getDefaultForm())
 
 // 修改点：校验规则中的 prop 改为小驼峰
 const rules: FormRules = {

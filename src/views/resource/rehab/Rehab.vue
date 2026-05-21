@@ -43,7 +43,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { OfficeBuilding, Monitor, VideoPlay, Reading, ChatDotRound } from '@element-plus/icons-vue'
+import { OfficeBuilding, VideoPlay, ChatDotRound } from '@element-plus/icons-vue'
 
 const router = useRouter()
 

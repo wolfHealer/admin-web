@@ -1,42 +1,43 @@
 import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
+import { getDiseaseList } from '@/api/knowledge/knowledge'
+import {
+  asNumber,
+  asString,
+  mapDetailResponse,
+  mapListResponse,
+  fromDisease,
+  normalizeDiseaseList,
+  normalizeIdList,
+  pickField,
+  type DiseaseOption,
+  type RawRecord,
+} from '@/api/resource/shared/normalize'
 
-export interface ApiResponse<T = any> {
-  code: number
-  data: T
-  message?: string
-}
-
-// src/api/resource/charity/project.ts
-
-export interface DiseaseOption {
-  id: number;
-  name: string;
-  alias?: string;
-}
+export type { DiseaseOption }
 
 export interface ReliefProjectItem {
-  id?: number;
-  name: string;
-  organizer: string;
-  reliefType: string; // 对应后端的 type 或 reliefType，需根据实际后端调整，这里假设前端统一用 reliefType
-  applyCondition: string;
-  reliefStandard: string;
-  applyDeadline?: string;
-  applyDifficulty: string;
-  applyProcess: string;
-  applyForm?: string;
-  applyGuide?: string;
-  materialList?: string;
-  contactPhone?: string;
-  contactUrl?: string;
-  auditStatus: number;
-  rejectReason?: string;
-  sort: number;
-  
-  // 关键：用于表单提交和展示的 ID 列表
-  diseaseIds?: number[]; 
-  // 关键：后端详情接口返回的完整对象列表，用于展示名称
-  diseases?: DiseaseOption[]; 
+  id?: number
+  name: string
+  organizer: string
+  reliefType: string
+  applyCondition: string
+  reliefStandard: string
+  applyDeadline?: string
+  applyDifficulty: string
+  applyProcess: string
+  applyForm?: string
+  applyGuide?: string
+  materialList?: string
+  contactPhone?: string
+  contactUrl?: string
+  auditStatus: number
+  rejectReason?: string
+  sort: number
+  createdAt?: string
+  updatedAt?: string
+  diseaseIds?: number[]
+  diseases?: DiseaseOption[]
 }
 
 export interface ReliefProjectListParams {
@@ -49,58 +50,103 @@ export interface ReliefProjectListParams {
   diseaseId?: number | ''
 }
 
-export interface ReliefProjectListResponse {
-  list: ReliefProjectItem[]
-  total: number
+export interface ReliefProjectForm {
+  id?: number
+  name: string
+  organizer: string
+  reliefType: string
+  applyCondition: string
+  reliefStandard: string
+  applyDeadline?: string
+  applyDifficulty: string
+  applyProcess: string
+  applyForm?: string
+  applyGuide?: string
+  materialList?: string
+  contactPhone?: string
+  contactUrl?: string
+  auditStatus: number
+  rejectReason?: string
+  sort: number
+  diseaseIds?: number[]
 }
 
-export const getReliefProjectList = (params: ReliefProjectListParams) => {
-  return request<ApiResponse<ReliefProjectListResponse>>({
-    url: '/resource/charity/projects',
-    method: 'get',
-    params,
-  })
+const normalizeReliefProject = (raw: RawRecord): ReliefProjectItem => {
+  const diseases = normalizeDiseaseList(pickField(raw, 'diseases'))
+  const diseaseIds = normalizeIdList(pickField(raw, 'diseaseIds', 'disease_ids'))
+  return {
+    id: raw.id !== undefined ? asNumber(raw.id) : undefined,
+    name: asString(pickField(raw, 'name')),
+    organizer: asString(pickField(raw, 'organizer')),
+    reliefType: asString(pickField(raw, 'reliefType', 'relief_type') || pickField(raw, 'type')),
+    applyCondition: asString(pickField(raw, 'applyCondition', 'apply_condition')),
+    reliefStandard: asString(pickField(raw, 'reliefStandard', 'relief_standard')),
+    applyDeadline: asString(pickField(raw, 'applyDeadline', 'apply_deadline')),
+    applyDifficulty: asString(pickField(raw, 'applyDifficulty', 'apply_difficulty')),
+    applyProcess: asString(pickField(raw, 'applyProcess', 'apply_process')),
+    applyForm: asString(pickField(raw, 'applyForm', 'apply_form')),
+    applyGuide: asString(pickField(raw, 'applyGuide', 'apply_guide')),
+    materialList: asString(pickField(raw, 'materialList', 'material_list')),
+    contactPhone: asString(pickField(raw, 'contactPhone', 'contact_phone')),
+    contactUrl: asString(pickField(raw, 'contactUrl', 'contact_url')),
+    auditStatus: asNumber(pickField(raw, 'auditStatus', 'audit_status')),
+    rejectReason: asString(pickField(raw, 'rejectReason', 'reject_reason')),
+    sort: asNumber(pickField(raw, 'sort')),
+    diseaseIds: diseaseIds.length ? diseaseIds : diseases.map((d) => d.id),
+    diseases,
+    createdAt: asString(pickField(raw, 'createdAt', 'created_at')),
+    updatedAt: asString(pickField(raw, 'updatedAt', 'updated_at')),
+  }
 }
 
-export const getReliefProjectDetail = (id: number) => {
-  return request<ApiResponse<ReliefProjectItem>>({
-    url: `/resource/charity/projects/${id}`,
-    method: 'get',
-  })
+const toSubmitPayload = (data: ReliefProjectForm) => {
+  const payload: Record<string, unknown> = {
+    name: data.name,
+    organizer: data.organizer,
+    reliefType: data.reliefType,
+    applyCondition: data.applyCondition,
+    reliefStandard: data.reliefStandard,
+    applyDeadline: data.applyDeadline || '',
+    applyDifficulty: data.applyDifficulty,
+    applyProcess: data.applyProcess,
+    applyForm: data.applyForm || '',
+    applyGuide: data.applyGuide || '',
+    materialList: data.materialList || '',
+    contactPhone: data.contactPhone || '',
+    contactUrl: data.contactUrl || '',
+    auditStatus: data.auditStatus,
+    rejectReason: data.rejectReason || '',
+    sort: data.sort,
+    diseaseIds: data.diseaseIds || [],
+  }
+  return payload
 }
 
-export const addReliefProject = (data: Partial<ReliefProjectItem>) => {
-  return request<ApiResponse>({
-    url: '/resource/charity/projects',
-    method: 'post',
-    data,
-  })
+export const getReliefProjectList = async (
+  params: ReliefProjectListParams
+): Promise<ApiResponse<{ list: ReliefProjectItem[]; total: number }>> => {
+  const res = await request.get<{ list?: RawRecord[]; total?: number }>('/resource/charity/projects', { params })
+  return mapListResponse(res, normalizeReliefProject)
 }
 
-export const updateReliefProject = (id: number, data: Partial<ReliefProjectItem>) => {
-  return request<ApiResponse>({
-    url: `/resource/charity/projects/${id}`,
-    method: 'put',
-    data,
-  })
+export const getReliefProjectDetail = async (id: number): Promise<ApiResponse<ReliefProjectItem>> => {
+  const res = await request.get<RawRecord>(`/resource/charity/projects/${id}`)
+  return mapDetailResponse(res, normalizeReliefProject)
 }
 
-export const deleteReliefProject = (id: number) => {
-  return request<ApiResponse>({
-    url: `/resource/charity/projects/${id}`,
-    method: 'delete',
-  })
+export const addReliefProject = (data: ReliefProjectForm): Promise<ApiResponse<null>> => {
+  return request.post('/resource/charity/projects', toSubmitPayload(data))
 }
 
-export const searchDiseaseOptions = (keyword = '') => {
-  return request<ApiResponse<{ list: DiseaseOption[] } | DiseaseOption[]>>({
-    url: '/knowledge/diseases',
-    method: 'get',
-    params: {
-      page: 1,
-      pageSize: 20,
-      keyword,
-      status: 1,
-    },
-  })
+export const updateReliefProject = (id: number, data: ReliefProjectForm): Promise<ApiResponse<null>> => {
+  return request.put(`/resource/charity/projects/${id}`, toSubmitPayload(data))
+}
+
+export const deleteReliefProject = (id: number): Promise<ApiResponse<null>> => {
+  return request.delete(`/resource/charity/projects/${id}`)
+}
+
+export const searchDiseaseOptions = async (keyword = ''): Promise<DiseaseOption[]> => {
+  const res = await getDiseaseList({ page: 1, pageSize: 20, keyword, status: 1 })
+  return (res.data?.list ?? []).map(fromDisease)
 }

@@ -112,37 +112,74 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
+import type { DonationProjectForm, ReliefProjectItem } from '@/api/resource/drug/donationProject'
 
-// 定义符合新接口结构的类型
 interface ProjectForm {
-  id?: number;
-  drugId?: number | null;
-  drugName?: string;
-  diseaseId?: number | null;
-  diseaseName?: string;
-  name: string;
-  organizer: string;
-  condition: string;
-  period: string;
-  dosage: string;
-  applyForm: string;
-  applyGuide: string;
-  materialList: string;
-  progressQuery: string;
-  auditStatus: number;
-  rejectReason: string;
-  updatedAt?: string;
+  id?: number
+  drugId?: number | null
+  drugName?: string
+  diseaseId?: number | null
+  diseaseName?: string
+  name: string
+  organizer: string
+  condition: string
+  period: string
+  dosage: string
+  applyForm: string
+  applyGuide: string
+  materialList: string
+  progressQuery: string
+  auditStatus: number
+  rejectReason: string
+  updatedAt?: string
 }
+
+const toProjectForm = (item: ReliefProjectItem): ProjectForm => ({
+  id: item.id,
+  drugId: item.drugId,
+  drugName: item.drugGenericName || item.drugBrandName,
+  diseaseId: item.diseaseId,
+  diseaseName: item.diseaseName,
+  name: item.name,
+  organizer: item.organizer,
+  condition: item.applyCondition,
+  period: item.reliefCycle,
+  dosage: item.reliefDosageDesc,
+  applyForm: item.applyForm,
+  applyGuide: item.applyGuide,
+  materialList: item.materialList,
+  progressQuery: item.progressQuery,
+  auditStatus: item.auditStatus,
+  rejectReason: item.rejectReason ?? '',
+  updatedAt: item.updatedAt,
+})
+
+const toReliefPayload = (form: ProjectForm): DonationProjectForm & { id?: number } => ({
+  id: form.id,
+  drugId: form.drugId ?? null,
+  diseaseId: form.diseaseId ?? null,
+  name: form.name,
+  organizer: form.organizer,
+  applyCondition: form.condition,
+  reliefCycle: form.period,
+  reliefDosageDesc: form.dosage,
+  applyForm: form.applyForm,
+  applyGuide: form.applyGuide,
+  materialList: form.materialList,
+  progressQuery: form.progressQuery,
+  auditStatus: form.auditStatus,
+  rejectReason: form.rejectReason,
+})
 
 interface Props {
   modelValue: boolean
-  editData?: ProjectForm | null
+  editData?: ReliefProjectItem | null
 }
 
 const props = withDefaults(defineProps<Props>(), { editData: null })
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  submit: [data: ProjectForm]
+  submit: [data: DonationProjectForm & { id?: number }]
 }>()
 
 const formRef = ref<FormInstance>()
@@ -185,8 +222,7 @@ watch(() => props.modelValue, async (val) => {
   if (val) {
     if (props.editData) {
       isEdit.value = true
-      // 直接赋值，因为字段名已经统一
-      Object.assign(formData, createEmptyForm(), props.editData)
+      Object.assign(formData, createEmptyForm(), toProjectForm(props.editData))
     } else {
       isEdit.value = false
       resetForm()
@@ -214,8 +250,7 @@ const handleSubmit = async () => {
   if (!valid) return
   submitLoading.value = true
   try {
-    // 提交时直接发送 formData，字段名已与后端匹配
-    emit('submit', { ...formData })
+    emit('submit', toReliefPayload(formData))
   } finally {
     submitLoading.value = false
   }

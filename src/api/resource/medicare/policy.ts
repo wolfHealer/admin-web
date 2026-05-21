@@ -1,7 +1,15 @@
-// src/api/resource/charity/charity.ts
 import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
+import {
+  asNumber,
+  asString,
+  mapDetailResponse,
+  mapListResponse,
+  pickField,
+  type RawRecord,
+} from '@/api/resource/shared/normalize'
 
-export interface CharityParams {
+export interface PolicyListParams {
   page: number
   pageSize: number
   keyword?: string
@@ -9,9 +17,7 @@ export interface CharityParams {
   type?: string
 }
 
-
-
-export interface MedicarePolicy {
+export interface MedicarePolicyItem {
   id: number
   title: string
   policyType: string
@@ -22,44 +28,61 @@ export interface MedicarePolicy {
   fileUrl?: string
 }
 
+/** @deprecated 使用 MedicarePolicyItem */
+export type MedicarePolicy = MedicarePolicyItem
 
-
-
-// ============ 医保政策解读 ============
-export const getPolicyList = (params: CharityParams) => {
-  return request({
-    url: '/resource/medicare/policies',
-    method: 'get',
-    params
-  })
+export interface MedicarePolicyForm {
+  id?: number
+  title: string
+  policyType: string
+  region: string
+  status: number
+  uploadTime?: string
+  content?: string
+  fileUrl?: string
 }
 
-export const getPolicyDetail = (id: number) => {
-  return request({
-    url: `/resource/medicare/policies/${id}`,
-    method: 'get'
-  })
+const normalizePolicy = (raw: RawRecord): MedicarePolicyItem => ({
+  id: asNumber(raw.id),
+  title: asString(pickField(raw, 'title')),
+  policyType: asString(pickField(raw, 'policyType', 'policy_type')),
+  region: asString(pickField(raw, 'region')),
+  status: asNumber(pickField(raw, 'status')),
+  uploadTime: asString(pickField(raw, 'uploadTime', 'upload_time')),
+  content: asString(pickField(raw, 'content')),
+  fileUrl: asString(pickField(raw, 'fileUrl', 'file_url')),
+})
+
+const toSubmitPayload = (data: MedicarePolicyForm) => ({
+  title: data.title,
+  policyType: data.policyType,
+  region: data.region,
+  status: data.status,
+  uploadTime: data.uploadTime || '',
+  content: data.content || '',
+  fileUrl: data.fileUrl || '',
+})
+
+export const getPolicyList = async (
+  params: PolicyListParams
+): Promise<ApiResponse<{ list: MedicarePolicyItem[]; total: number }>> => {
+  const res = await request.get<{ list?: RawRecord[]; total?: number }>('/resource/medicare/policies', { params })
+  return mapListResponse(res, normalizePolicy)
 }
 
-export const addPolicy = (data: Partial<MedicarePolicy>) => {
-  return request({
-    url: '/resource/medicare/policies',
-    method: 'post',
-    data
-  })
+export const getPolicyDetail = async (id: number): Promise<ApiResponse<MedicarePolicyItem>> => {
+  const res = await request.get<RawRecord>(`/resource/medicare/policies/${id}`)
+  return mapDetailResponse(res, normalizePolicy)
 }
 
-export const updatePolicy = (id: number, data: Partial<MedicarePolicy>) => {
-  return request({
-    url: `/resource/medicare/policies/${id}`,
-    method: 'put',
-    data
-  })
+export const addPolicy = (data: MedicarePolicyForm): Promise<ApiResponse<null>> => {
+  return request.post('/resource/medicare/policies', toSubmitPayload(data))
 }
 
-export const deletePolicy = (id: number) => {
-  return request({
-    url: `/resource/medicare/policies/${id}`,
-    method: 'delete'
-  })
+export const updatePolicy = (id: number, data: MedicarePolicyForm): Promise<ApiResponse<null>> => {
+  return request.put(`/resource/medicare/policies/${id}`, toSubmitPayload(data))
+}
+
+export const deletePolicy = (id: number): Promise<ApiResponse<null>> => {
+  return request.delete(`/resource/medicare/policies/${id}`)
 }

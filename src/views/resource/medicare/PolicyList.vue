@@ -1,19 +1,17 @@
-<!-- src/views/resource/charity/PolicyList.vue -->
 <template>
-  <div class="charity-list-page">
+  <div class="policy-list-page">
     <el-card>
       <template #header>
         <div class="card-header">
-          <!-- 新增：返回按钮区域 -->
           <div class="header-left">
             <el-button link @click="handleBack" class="back-btn">
               <el-icon><ArrowLeft /></el-icon>
-              返回公益救助中心
+              返回医保政策中心
             </el-button>
             <span class="page-title">医保政策解读</span>
           </div>
-          
-          <el-button type="primary" @click="handleAdd">
+
+          <el-button type="primary" @click="openAdd">
             <el-icon><Plus /></el-icon>
             新增解读
           </el-button>
@@ -22,10 +20,11 @@
 
       <div class="filter-bar">
         <el-input
-          v-model="filters.keyword"
+          v-model="query.keyword"
           placeholder="搜索政策标题"
           clearable
           style="width: 200px"
+          @keyup.enter="handleSearch"
           @clear="handleSearch"
         >
           <template #prefix>
@@ -33,7 +32,7 @@
           </template>
         </el-input>
         <el-select
-          v-model="filters.status"
+          v-model="query.status"
           placeholder="状态筛选"
           clearable
           style="width: 120px"
@@ -64,8 +63,8 @@
         </el-table-column>
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleView(row)">查看</el-button>
-            <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+            <el-button link type="primary" @click="openView(row)">查看</el-button>
+            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -73,20 +72,20 @@
 
       <div class="pagination-wrapper">
         <el-pagination
-          v-model:current-page="pagination.currentPage"
-          v-model:page-size="pagination.pageSize"
-          :total="pagination.total"
+          v-model:current-page="query.page"
+          v-model:page-size="query.pageSize"
+          :total="total"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSearch"
-          @current-change="handleSearch"
+          @size-change="loadData"
+          @current-change="loadData"
         />
       </div>
     </el-card>
 
     <PolicyDialog
-      v-model="dialog.visible"
-      :is-edit="dialog.isEdit"
-      :data="dialog.data"
+      v-model="editDialog.visible"
+      :is-edit="editDialog.isEdit"
+      :data="editDialog.data"
       @submit="submitData"
     />
 
@@ -98,159 +97,87 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router' // 1. 引入 useRouter
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, ArrowLeft } from '@element-plus/icons-vue' // 2. 引入 ArrowLeft 图标
-import { 
-  getPolicyList,
-  getPolicyDetail,
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { Plus, Search, ArrowLeft } from '@element-plus/icons-vue'
+import { useTable, useCrudDialog } from '@/composables'
+import {
   addPolicy,
+  deletePolicy,
+  getPolicyDetail,
+  getPolicyList,
   updatePolicy,
-  deletePolicy
+  type MedicarePolicy,
 } from '@/api/resource/medicare/policy'
-import type { MedicarePolicy } from '@/api/resource/medicare/policy'
 import PolicyDialog from './components/PolicyDialog.vue'
 import PolicyViewDialog from './components/PolicyViewDialog.vue'
 
-const router = useRouter() // 3. 初始化 router
-
-const loading = ref(false)
-const tableData = ref<MedicarePolicy[]>([])
-
-const pagination = reactive({
-  currentPage: 1,
-  pageSize: 10,
-  total: 0
-})
-
-const filters = reactive({
-  keyword: '',
-  status: null as number | null
-})
-
-const dialog = reactive({
-  visible: false,
-  isEdit: false,
-  data: null as MedicarePolicy | null
-})
-
-const viewDialog = reactive({
-  visible: false,
-  data: null as MedicarePolicy | null
-})
-
-// 4. 新增返回方法
-const handleBack = () => {
-  router.push('/resource/medicare')
+type PolicyQuery = {
+  page: number
+  pageSize: number
+  keyword: string
+  status: number | ''
 }
+
+const router = useRouter()
+
+const { loading, tableData, total, query, loadData, handleSearch, handleReset, refresh } = useTable<
+  MedicarePolicy,
+  PolicyQuery
+>({
+  initialQuery: () => ({
+    page: 1,
+    pageSize: 10,
+    keyword: '',
+    status: '',
+  }),
+  fetchApi: async (params) => {
+    const res = await getPolicyList({
+      page: params.page,
+      pageSize: params.pageSize,
+      keyword: params.keyword || undefined,
+      status: params.status === '' ? undefined : String(params.status),
+    })
+    return res.data
+  },
+  errorMessage: '加载列表失败',
+})
+
+const { editDialog, viewDialog, openAdd, openEdit, openView, handleDelete } = useCrudDialog<MedicarePolicy>({
+  strategy: 'byData',
+  getRowId: (row) => row.id,
+  fetchDetail: async (id) => (await getPolicyDetail(id)).data,
+  deleteItem: (row) => deletePolicy(row.id),
+  deleteMessage: (row) => `确定要删除「${row.title}」吗？`,
+  onSuccess: refresh,
+})
+
+const handleBack = () => router.push('/resource/medicare')
 
 const formatDateTime = (dateStr: string) => {
   if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleString('zh-CN')
-}
-
-const handleAdd = () => {
-  dialog.isEdit = false
-  dialog.data = null
-  dialog.visible = true
-}
-
-const handleEdit = async (row: MedicarePolicy) => {
-  try {
-    const res = await getPolicyDetail(row.id)
-    if ((res as any).code === 200 || (res as any).code === 0) {
-      dialog.isEdit = true
-      dialog.data = (res as any).data
-      dialog.visible = true
-    }
-  } catch (error) {
-    ElMessage.error('获取详情失败')
-  }
-}
-
-const handleView = async (row: MedicarePolicy) => {
-  try {
-    const res = await getPolicyDetail(row.id)
-    if ((res as any).code === 200 || (res as any).code === 0) {
-      viewDialog.data = (res as any).data
-      viewDialog.visible = true
-    }
-  } catch (error) {
-    ElMessage.error('获取详情失败')
-  }
-}
-
-const handleDelete = async (row: MedicarePolicy) => {
-  await ElMessageBox.confirm(`确定要删除"${row.title}"吗？`, '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  })
-  try {
-    await deletePolicy(row.id)
-    ElMessage.success('删除成功')
-    loadData()
-  } catch (error) {
-    ElMessage.error('删除失败')
-  }
+  return new Date(dateStr).toLocaleString('zh-CN')
 }
 
 const submitData = async (formData: MedicarePolicy) => {
   try {
-    if (dialog.isEdit && formData.id) {
+    if (editDialog.value.isEdit && formData.id) {
       await updatePolicy(formData.id, formData)
+      ElMessage.success('编辑成功')
     } else {
       await addPolicy(formData)
+      ElMessage.success('新增成功')
     }
-    ElMessage.success(dialog.isEdit ? '编辑成功' : '新增成功')
-    loadData()
-    dialog.visible = false
-    dialog.data = null
-  } catch (error) {
+    editDialog.value.visible = false
+    await refresh()
+  } catch {
     ElMessage.error('操作失败')
   }
 }
-
-const handleSearch = () => {
-  pagination.currentPage = 1
-  loadData()
-}
-
-const handleReset = () => {
-  filters.keyword = ''
-  filters.status = null
-  handleSearch()
-}
-
-const loadData = async () => {
-  loading.value = true
-  try {
-    const res = await getPolicyList({
-      page: pagination.currentPage,
-      pageSize: pagination.pageSize,
-      keyword: filters.keyword,
-      status: filters.status ?? undefined
-    })
-    if ((res as any).code === 200 && (res as any).data) {
-      tableData.value = (res as any).data.list || []
-      pagination.total = (res as any).data.total || 0
-    }
-  } catch (error) {
-    ElMessage.error('加载列表失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(() => {
-  loadData()
-})
 </script>
 
 <style lang="scss" scoped>
-.charity-list-page {
+.policy-list-page {
   padding: 20px;
 
   .card-header {
@@ -258,7 +185,6 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
 
-    // 新增样式：左侧布局
     .header-left {
       display: flex;
       align-items: center;
@@ -268,11 +194,11 @@ onMounted(() => {
         font-size: 14px;
         color: #606266;
         padding: 0;
-        
+
         &:hover {
           color: var(--el-color-primary);
         }
-        
+
         .el-icon {
           margin-right: 4px;
         }

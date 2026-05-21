@@ -138,18 +138,36 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import type { Disease, DiseaseListParams } from '@/api/knowledge/knowledge'
+import type { DiseaseListParams } from '@/api/knowledge/knowledge'
 import { getDiseaseList } from '@/api/knowledge/knowledge'
-// 假设这里引入了正确的类型定义，如果类型定义也是 snake_case，建议在此处做局部类型覆盖或修改源类型
-import type { RareDrugItem, RareDrugSubmitPayload } from '@/api/resource/drug/drug'
+import type { DiseaseOption, RareDrugItem, RareDrugSubmitPayload } from '@/api/resource/drug/drug'
+
+type DrugFormData = {
+  id: number
+  genericName: string
+  brandName: string
+  indication: string
+  dosageForm: string
+  spec: string
+  refPrice: number
+  drugType: string
+  isInsurance: boolean
+  hasRelief: boolean
+  isLaunched: boolean
+  needPrescription: boolean
+  manualOriginal: string
+  manualPopular: string
+  auditStatus: number
+  rejectReason: string
+}
 
 interface Props {
   modelValue: boolean
-  editData?: any | null // 使用 any 暂时规避类型不匹配问题，实际应使用适配后的类型
+  drugItem?: RareDrugItem | null
 }
 
 const props = withDefaults(defineProps<Props>(), { 
-  editData: null 
+  drugItem: null 
 })
 
 const emit = defineEmits<{
@@ -161,7 +179,7 @@ const formRef = ref<FormInstance>()
 const dialogVisible = ref(false)
 const submitLoading = ref(false)
 const diseaseLoading = ref(false)
-const diseaseOptions = ref<Disease[]>([])
+const diseaseOptions = ref<DiseaseOption[]>([])
 const selectedDiseaseIds = ref<number[]>([])
 const isEdit = ref(false)
 
@@ -185,7 +203,46 @@ const getEmptyFormData = () => ({
   rejectReason: '',
 })
 
-const formData = reactive(getEmptyFormData())
+const formData = reactive<DrugFormData>(getEmptyFormData())
+
+const toFormData = (item: RareDrugItem): Partial<DrugFormData> => ({
+  id: item.id,
+  genericName: item.genericName,
+  brandName: item.brandName ?? '',
+  indication: item.indication,
+  dosageForm: item.dosageForm,
+  spec: item.spec,
+  refPrice: typeof item.refPrice === 'string' ? Number(item.refPrice) || 0 : item.refPrice,
+  drugType: item.drugType,
+  isInsurance: Boolean(item.isInsurance),
+  hasRelief: Boolean(item.hasRelief),
+  isLaunched: Boolean(item.isLaunched),
+  needPrescription: Boolean(item.needPrescription),
+  manualOriginal: item.manualOriginal ?? '',
+  manualPopular: item.manualPopular ?? '',
+  auditStatus: item.auditStatus,
+  rejectReason: item.rejectReason ?? '',
+})
+
+const toSubmitPayload = (form: DrugFormData): RareDrugSubmitPayload & { id?: number } => ({
+  ...(form.id ? { id: form.id } : {}),
+  genericName: form.genericName,
+  brandName: form.brandName,
+  indication: form.indication,
+  dosageForm: form.dosageForm,
+  spec: form.spec,
+  refPrice: form.refPrice,
+  drugType: form.drugType,
+  isInsurance: form.isInsurance ? 1 : 0,
+  hasRelief: form.hasRelief ? 1 : 0,
+  isLaunched: form.isLaunched ? 1 : 0,
+  needPrescription: form.needPrescription ? 1 : 0,
+  manualOriginal: form.manualOriginal,
+  manualPopular: form.manualPopular,
+  auditStatus: form.auditStatus,
+  rejectReason: form.rejectReason,
+  diseaseIds: selectedDiseaseIds.value,
+})
 
 const formRules: FormRules = {
   genericName: [{ required: true, message: '请输入通用名', trigger: 'blur' }],
@@ -196,8 +253,8 @@ const formRules: FormRules = {
   drugType: [{ required: true, message: '请选择药品类型', trigger: 'change' }],
 }
 
-const mergeDiseaseOptions = (items: Disease[] = []) => {
-  const map = new Map<number, Disease>()
+const mergeDiseaseOptions = (items: DiseaseOption[] = []) => {
+  const map = new Map<number, DiseaseOption>()
   // 保留已有选项并合并新选项，避免重复
   ;[...diseaseOptions.value, ...items].forEach((item) => {
     if (item?.id) map.set(item.id, item)
@@ -215,8 +272,13 @@ const searchDiseaseOptions = async (keyword = '') => {
       status: 1,
     }
     const res = await getDiseaseList(params)
-    const list = (res as any)?.data?.list || []
-    mergeDiseaseOptions(list)
+    mergeDiseaseOptions(
+      (res.data?.list ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        alias: item.alias,
+      }))
+    )
   } finally {
     diseaseLoading.value = false
   }
@@ -233,23 +295,15 @@ const handleOpen = async () => {
   // 先重置，防止上次数据残留
   resetForm()
   
-  if (props.editData) {
+  if (props.drugItem) {
     isEdit.value = true
-    // 核心修改：直接将后端返回的驼峰数据赋值给 formData
-    // 注意：如果后端返回的 refPrice 是字符串，这里可能需要 parseFloat
-    Object.assign(formData, {
-      ...getEmptyFormData(), // 先填充默认值，防止某些字段缺失导致 undefined
-      ...props.editData
-    })
+    Object.assign(formData, getEmptyFormData(), toFormData(props.drugItem))
 
-    // 处理关联疾病的回显
-    // 后端返回结构可能是 diseases: [{id:1, name:'...'}] 或者 disease_ids: [1, 2]
-    if (props.editData.diseases && Array.isArray(props.editData.diseases)) {
-      selectedDiseaseIds.value = props.editData.diseases.map((d: any) => d.id)
-      // 将已有的疾病加入选项列表，以便显示名称
-      mergeDiseaseOptions(props.editData.diseases)
-    } else if (props.editData.disease_ids) {
-      selectedDiseaseIds.value = props.editData.disease_ids
+    if (props.drugItem.diseases?.length) {
+      selectedDiseaseIds.value = props.drugItem.diseases.map((d) => d.id)
+      mergeDiseaseOptions(props.drugItem.diseases)
+    } else if (props.drugItem.diseaseIds?.length) {
+      selectedDiseaseIds.value = props.drugItem.diseaseIds
     }
   } else {
     isEdit.value = false
@@ -272,28 +326,7 @@ const handleSubmit = async () => {
 
   submitLoading.value = true
   try {
-    // 构造提交数据，保持驼峰命名，通常后端接收也期望驼峰，或者由 API 层转换
-    const payload = {
-      ...(formData.id ? { id: formData.id } : {}),
-      genericName: formData.genericName,
-      brandName: formData.brandName,
-      indication: formData.indication,
-      dosageForm: formData.dosageForm,
-      spec: formData.spec,
-      refPrice: formData.refPrice,
-      drugType: formData.drugType,
-      isInsurance: formData.isInsurance,
-      hasRelief: formData.hasRelief,
-      isLaunched: formData.isLaunched,
-      needPrescription: formData.needPrescription,
-      manualOriginal: formData.manualOriginal,
-      manualPopular: formData.manualPopular,
-      auditStatus: formData.auditStatus,
-      rejectReason: formData.rejectReason,
-      diseaseIds: selectedDiseaseIds.value, // 提交疾病ID列表
-    }
-    
-    emit('submit', payload as any)
+    emit('submit', toSubmitPayload(formData))
   } finally {
     submitLoading.value = false
   }

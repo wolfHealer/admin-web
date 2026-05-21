@@ -1,38 +1,44 @@
-
 import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
+import {
+  asNumber,
+  asString,
+  mapDetailResponse,
+  mapListResponse,
+  normalizeDiseaseList,
+  normalizeIdList,
+  pickField,
+  type DiseaseOption,
+  type RawRecord,
+} from '@/api/resource/shared/normalize'
 
-export interface ApiResponse<T = any> {
-  code: number
-  data: T
-  message?: string
-}
-
-export interface DiseaseOptionItem {
-  id: number
-  name: string
-  alias?: string
-}
+export type DiseaseOptionItem = DiseaseOption
 
 export interface ExaminationManualItem {
   id: number
-  exam_type: string
-  exam_name: string
-  exam_purpose: string
-  reference_value?: string
-  abnormal_interpret?: string
-  sample_notes?: string
-  institution?: string
-  template_excel?: string
-  template_word?: string
-  compare_template?: string
-  audit_status: number
-  reject_reason?: string
+  examType: string
+  examName: string
+  examPurpose: string
+  referenceValue: string
+  abnormalInterpret: string
+  sampleNotes: string
+  institution: string
+  templateExcel: string
+  templateWord: string
+  compareTemplate: string
+  templates: {
+    excel: string
+    word: string
+    compare: string
+  }
+  auditStatus: number
+  rejectReason: string
   sort: number
-  disease_count?: number
-  disease_ids?: number[]
-  diseases?: DiseaseOptionItem[]
-  created_at?: string
-  updated_at?: string
+  diseaseCount?: number
+  diseaseIds: number[]
+  diseases: DiseaseOption[]
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface ExaminationManualListParams {
@@ -44,82 +50,116 @@ export interface ExaminationManualListParams {
   diseaseId?: number | null
 }
 
-export interface ExaminationManualSavePayload {
+export interface ExaminationManualForm {
   id?: number
-  exam_type: string
-  exam_name: string
-  exam_purpose: string
-  reference_value: string
-  abnormal_interpret: string
-  sample_notes: string
+  examType: string
+  examName: string
+  examPurpose: string
+  referenceValue: string
+  abnormalInterpret: string
+  sampleNotes: string
   institution?: string
-  template_excel?: string
-  template_word?: string
-  compare_template?: string
-  audit_status: number
-  reject_reason?: string
+  templateExcel?: string
+  templateWord?: string
+  compareTemplate?: string
+  templates?: {
+    excel?: string
+    word?: string
+    compare?: string
+  }
+  auditStatus: number
+  rejectReason?: string
   sort: number
-  disease_ids: number[]
+  diseaseIds: number[]
 }
 
-export interface ExaminationManualListResponse {
-  list: ExaminationManualItem[]
-  total: number
+/** @deprecated 使用 ExaminationManualForm */
+export type ExaminationManualSavePayload = ExaminationManualForm
+
+const normalizeExamination = (raw: RawRecord): ExaminationManualItem => {
+  const diseases = normalizeDiseaseList(pickField(raw, 'diseases'))
+  const diseaseIds = normalizeIdList(pickField(raw, 'diseaseIds', 'disease_ids'))
+  const templateExcel = asString(pickField(raw, 'templateExcel', 'template_excel'))
+  const templateWord = asString(pickField(raw, 'templateWord', 'template_word'))
+  const compareTemplate = asString(pickField(raw, 'compareTemplate', 'compare_template'))
+  return {
+    id: asNumber(raw.id),
+    examType: asString(pickField(raw, 'examType', 'exam_type')),
+    examName: asString(pickField(raw, 'examName', 'exam_name')),
+    examPurpose: asString(pickField(raw, 'examPurpose', 'exam_purpose')),
+    referenceValue: asString(pickField(raw, 'referenceValue', 'reference_value')),
+    abnormalInterpret: asString(pickField(raw, 'abnormalInterpret', 'abnormal_interpret')),
+    sampleNotes: asString(pickField(raw, 'sampleNotes', 'sample_notes')),
+    institution: asString(pickField(raw, 'institution')),
+    templateExcel,
+    templateWord,
+    compareTemplate,
+    templates: {
+      excel: templateExcel,
+      word: templateWord,
+      compare: compareTemplate,
+    },
+    auditStatus: asNumber(pickField(raw, 'auditStatus', 'audit_status')),
+    rejectReason: asString(pickField(raw, 'rejectReason', 'reject_reason')),
+    sort: asNumber(pickField(raw, 'sort')),
+    diseaseIds: diseaseIds.length ? diseaseIds : diseases.map((d) => d.id),
+    diseases,
+    diseaseCount: diseases.length || diseaseIds.length,
+    createdAt: asString(pickField(raw, 'createdAt', 'created_at')),
+    updatedAt: asString(pickField(raw, 'updatedAt', 'updated_at')),
+  }
 }
 
-export const getExaminationList = (
+const toSubmitPayload = (data: ExaminationManualForm) => {
+  const templates = data.templates || {}
+  return {
+    exam_type: data.examType,
+    exam_name: data.examName,
+    exam_purpose: data.examPurpose,
+    reference_value: data.referenceValue,
+    abnormal_interpret: data.abnormalInterpret,
+    sample_notes: data.sampleNotes,
+    institution: data.institution || '',
+    template_excel: templates.excel ?? data.templateExcel ?? '',
+    template_word: templates.word ?? data.templateWord ?? '',
+    compare_template: templates.compare ?? data.compareTemplate ?? '',
+    audit_status: data.auditStatus,
+    reject_reason: data.rejectReason || '',
+    sort: data.sort,
+    disease_ids: data.diseaseIds || [],
+  }
+}
+
+export const getExaminationList = async (
   params: ExaminationManualListParams
-): Promise<ApiResponse<ExaminationManualListResponse>> => {
-  return request({
-    url: '/resource/medical/examinations',
-    method: 'get',
-    params
-  })
+): Promise<ApiResponse<{ list: ExaminationManualItem[]; total: number }>> => {
+  const res = await request.get<{ list?: RawRecord[]; total?: number }>('/resource/medical/examinations', { params })
+  return mapListResponse(res, normalizeExamination)
 }
 
-export const getExaminationDetail = (
-  id: number | string
-): Promise<ApiResponse<ExaminationManualItem>> => {
-  return request({
-    url: `/resource/medical/examinations/${id}`,
-    method: 'get'
-  })
+export const getExaminationDetail = async (id: number | string): Promise<ApiResponse<ExaminationManualItem>> => {
+  const res = await request.get<RawRecord>(`/resource/medical/examinations/${id}`)
+  return mapDetailResponse(res, normalizeExamination)
 }
 
-export const addExamination = (
-  data: ExaminationManualSavePayload
-): Promise<ApiResponse> => {
-  return request({
-    url: '/resource/medical/examinations',
-    method: 'post',
-    data
-  })
+export const addExamination = (data: ExaminationManualForm): Promise<ApiResponse<null>> => {
+  return request.post('/resource/medical/examinations', toSubmitPayload(data))
 }
 
-export const updateExamination = (
-  id: number | string,
-  data: ExaminationManualSavePayload
-): Promise<ApiResponse> => {
-  return request({
-    url: `/resource/medical/examinations/${id}`,
-    method: 'put',
-    data
-  })
+export const updateExamination = (id: number | string, data: ExaminationManualForm): Promise<ApiResponse<null>> => {
+  return request.put(`/resource/medical/examinations/${id}`, toSubmitPayload(data))
 }
 
-export const deleteExamination = (id: number | string): Promise<ApiResponse> => {
-  return request({
-    url: `/resource/medical/examinations/${id}`,
-    method: 'delete'
-  })
+export const deleteExamination = (id: number | string): Promise<ApiResponse<null>> => {
+  return request.delete(`/resource/medical/examinations/${id}`)
 }
 
-export const getDiseaseOptions = (
-  keyword = ''
-): Promise<ApiResponse<DiseaseOptionItem[]>> => {
-  return request({
-    url: '/knowledge/diseases/options',
-    method: 'get',
-    params: { keyword }
-  })
+export const getDiseaseOptions = async (keyword = ''): Promise<ApiResponse<DiseaseOption[]>> => {
+  const res = await request.get<RawRecord[]>('/knowledge/diseases/options', { params: { keyword } })
+  const list = (res.data ?? []).map((item) => ({
+    id: asNumber(item.id),
+    name: asString(item.name),
+    alias: asString(item.alias),
+  }))
+  return { ...res, data: list }
 }

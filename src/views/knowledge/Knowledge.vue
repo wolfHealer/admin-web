@@ -176,12 +176,12 @@ const tagDialog = reactive({
 const diseaseDialog = reactive({
   visible: false,
   isEdit: false,
-  data: null as any,
+  data: null as Partial<Disease> | null,
 })
 
 const viewDialog = reactive({
   visible: false,
-  data: {} as any,
+  data: {} as Disease,
 })
 
 const tagOptions = computed(() => tagTableData.value.filter((item) => item.status === 1))
@@ -203,7 +203,8 @@ const loadCategoryTree = async () => {
   try {
     categoryLoading.value = true
     const res = await getCategoryTree()
-    categoryTree.value = res.data?.categories || res.data || []
+    const data = res.data
+    categoryTree.value = Array.isArray(data) ? data : (data.categories ?? [])
   } catch (error) {
     ElMessage.error('获取分类树失败')
   } finally {
@@ -215,7 +216,8 @@ const loadTagList = async () => {
   try {
     tagLoading.value = true
     const res = await getTagList({ ...tagFilters })
-    tagTableData.value = res.data?.list || res.data?.tags || res.data || []
+    const data = res.data
+    tagTableData.value = Array.isArray(data) ? data : (data.list ?? data.tags ?? [])
   } catch (error) {
     ElMessage.error('获取标签列表失败')
   } finally {
@@ -371,8 +373,8 @@ const handleEditDisease = async (row: Disease) => {
     images: detail.images || row.images || [],
     status: detail.status ?? row.status,
     primaryCategoryId: detail.primaryCategoryId || row.primaryCategoryId,
-    categoryIds: detail.categoryIds || row.categoryIds || (detail.categories || row.categories || []).map((item: any) => item.id),
-    tagIds: detail.tagIds || row.tagIds || (detail.tags || row.tags || []).map((item: any) => item.id),
+    categoryIds: detail.categoryIds || row.categoryIds || (detail.categories || row.categories || []).map((item) => item.id),
+    tagIds: detail.tagIds || row.tagIds || (detail.tags || row.tags || []).map((item) => item.id),
   }
   diseaseDialog.visible = true
 }

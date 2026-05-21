@@ -95,12 +95,21 @@ export interface TagSubmitPayload {
   status?: 0 | 1
 }
 
+export interface DiseaseListResponse {
+  list: Disease[]
+  total: number
+}
+
+export type CategoryTreeData = CategoryTreeNode[] | { categories?: CategoryTreeNode[] }
+
+export type TagListData = TagItem[] | { list?: TagItem[]; tags?: TagItem[] }
+
 export const getCategoryTree = () => {
-  return request.get('/knowledge/categories/tree')
+  return request.get<CategoryTreeData>('/knowledge/categories/tree')
 }
 
 export const addCategory = (data: CategorySubmitPayload) => {
-  return request.post('/knowledge/category', {
+  return request.post<null>('/knowledge/category', {
     name: data.name,
     code: data.code,
     parentId: data.parentId,
@@ -113,7 +122,7 @@ export const addCategory = (data: CategorySubmitPayload) => {
 }
 
 export const updateCategory = (id: number, data: Partial<CategorySubmitPayload>) => {
-  return request.put(`/knowledge/category/${id}`, {
+  return request.put<null>(`/knowledge/category/${id}`, {
     name: data.name,
     code: data.code,
     parentId: data.parentId,
@@ -126,15 +135,15 @@ export const updateCategory = (id: number, data: Partial<CategorySubmitPayload>)
 }
 
 export const deleteCategory = (id: number) => {
-  return request.delete(`/knowledge/category/${id}`)
+  return request.delete<null>(`/knowledge/category/${id}`)
 }
 
 export const getTagList = (params?: { keyword?: string; status?: number | null }) => {
-  return request.get('/knowledge/tags', { params })
+  return request.get<TagListData>('/knowledge/tags', { params })
 }
 
 export const addTag = (data: TagSubmitPayload) => {
-  return request.post('/knowledge/tag', {
+  return request.post<null>('/knowledge/tag', {
     name: data.name,
     code: data.code,
     sort_order: data.sortOrder,
@@ -143,7 +152,7 @@ export const addTag = (data: TagSubmitPayload) => {
 }
 
 export const updateTag = (id: number, data: Partial<TagSubmitPayload>) => {
-  return request.put(`/knowledge/tag/${id}`, {
+  return request.put<null>(`/knowledge/tag/${id}`, {
     name: data.name,
     code: data.code,
     sort_order: data.sortOrder,
@@ -152,19 +161,19 @@ export const updateTag = (id: number, data: Partial<TagSubmitPayload>) => {
 }
 
 export const deleteTag = (id: number) => {
-  return request.delete(`/knowledge/tag/${id}`)
+  return request.delete<null>(`/knowledge/tag/${id}`)
 }
 
 export const getDiseaseList = (params: DiseaseListParams) => {
-  return request.get('/knowledge/diseases', { params })
+  return request.get<DiseaseListResponse>('/knowledge/diseases', { params })
 }
 
 export const getDiseaseDetail = (id: number) => {
-  return request.get(`/knowledge/disease/${id}`)
+  return request.get<Disease>(`/knowledge/disease/${id}`)
 }
 
 export const addDisease = (data: DiseaseSubmitPayload) => {
-  return request.post('/knowledge/disease', {
+  return request.post<null>('/knowledge/disease', {
     name: data.name,
     alias: data.alias,
     introduction: data.introduction,
@@ -178,7 +187,7 @@ export const addDisease = (data: DiseaseSubmitPayload) => {
 }
 
 export const updateDisease = (id: number, data: Partial<DiseaseSubmitPayload>) => {
-  return request.put(`/knowledge/disease/${id}`, {
+  return request.put<null>(`/knowledge/disease/${id}`, {
     name: data.name,
     alias: data.alias,
     introduction: data.introduction,
@@ -192,5 +201,5 @@ export const updateDisease = (id: number, data: Partial<DiseaseSubmitPayload>) =
 }
 
 export const deleteDisease = (id: number) => {
-  return request.delete(`/knowledge/disease/${id}`)
+  return request.delete<null>(`/knowledge/disease/${id}`)
 }

@@ -142,23 +142,21 @@ const resetForm = () => {
 }
 
 watch(
-  () => [props.data, props.isEdit, props.defaultParentId],
-  ([newData, isEdit, defaultPid]) => {
-    if (newData && isEdit) {
-      formData.id = newData.id
-      formData.parentId = newData.parentId || 0
-      formData.name = newData.name
-      formData.code = newData.code
-      formData.iconUrl = newData.iconUrl || ''
-      formData.sortOrder = newData.sortOrder || 0
-      formData.status = newData.status ?? 1
-      formData.description = newData.description || ''
-      formData.level = newData.level // 编辑时直接使用后端返回的层级
+  () => ({ data: props.data, isEdit: props.isEdit, defaultPid: props.defaultParentId }),
+  ({ data, isEdit, defaultPid }) => {
+    if (data && isEdit) {
+      formData.id = data.id
+      formData.parentId = data.parentId || 0
+      formData.name = data.name
+      formData.code = data.code
+      formData.iconUrl = data.iconUrl || ''
+      formData.sortOrder = data.sortOrder || 0
+      formData.status = data.status ?? 1
+      formData.description = data.description || ''
+      formData.level = data.level
     } else {
-      // 新增模式
       formData.parentId = defaultPid || 0
-      formData.level = calculateLevel(formData.parentId) // 根据默认父ID计算层级
-      // 其他字段保持 resetForm 中的默认值，或者在这里显式重置
+      formData.level = calculateLevel(formData.parentId)
       formData.id = null
       formData.name = ''
       formData.code = ''

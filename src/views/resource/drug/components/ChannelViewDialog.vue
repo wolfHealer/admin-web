@@ -4,7 +4,7 @@
       <!-- 【修改点1】正确显示关联药品列表 -->
       <el-descriptions-item label="关联药品">
         <div v-if="viewData.drugs && viewData.drugs.length > 0">
-          <div v-for="(drug, index) in viewData.drugs" :key="drug.id" style="margin-bottom: 4px;">
+          <div v-for="drug in viewData.drugs" :key="drug.id" style="margin-bottom: 4px;">
             {{ drug.genericName }}
             <span v-if="drug.brandName">（{{ drug.brandName }}）</span>
           </div>

@@ -44,12 +44,12 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import type { CharityPolicy } from '@/api/resource/charity/charity'
+import type { MedicarePolicy } from '@/api/resource/medicare/policy'
 
 interface Props {
   modelValue: boolean
   isEdit: boolean
-  data: CharityPolicy | null
+  data: MedicarePolicy | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -60,14 +60,14 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  submit: [data: CharityPolicy]
+  submit: [data: MedicarePolicy]
 }>()
 
 const formRef = ref<FormInstance>()
 const dialogVisible = ref(false)
 const submitLoading = ref(false)
 
-const getEmptyFormData = (): CharityPolicy => ({
+const getEmptyFormData = (): MedicarePolicy => ({
   id: 0,
   title: '',
   policyType: '',
@@ -78,7 +78,7 @@ const getEmptyFormData = (): CharityPolicy => ({
   fileUrl: ''
 })
 
-const formData = reactive<CharityPolicy>(getEmptyFormData())
+const formData = reactive<MedicarePolicy>(getEmptyFormData())
 
 const formRules: FormRules = {
   title: [{ required: true, message: '请输入政策标题', trigger: 'blur' }],

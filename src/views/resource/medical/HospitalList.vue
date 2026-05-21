@@ -11,7 +11,7 @@
             </el-button>
             <span class="page-title">医院管理</span>
           </div>
-          <el-button type="primary" @click="handleAdd">
+          <el-button type="primary" @click="openAdd">
             <el-icon><Plus /></el-icon>
             新增医院
           </el-button>
@@ -20,7 +20,7 @@
 
       <div class="filter-bar">
         <el-input
-          v-model="filters.keyword"
+          v-model="query.keyword"
           placeholder="搜索医院名称/诊疗范围"
           clearable
           style="width: 220px"
@@ -32,16 +32,16 @@
           </template>
         </el-input>
 
-        <el-select v-model="filters.level" placeholder="医院等级" clearable style="width: 140px">
+        <el-select v-model="query.level" placeholder="医院等级" clearable style="width: 140px">
           <el-option v-for="item in levelOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
 
-        <el-select v-model="filters.isRareNetwork" placeholder="协作网" clearable style="width: 140px">
+        <el-select v-model="query.isRareNetwork" placeholder="协作网" clearable style="width: 140px">
           <el-option label="罕见病协作网" :value="1" />
           <el-option label="非协作网" :value="0" />
         </el-select>
 
-        <el-select v-model="filters.auditStatus" placeholder="审核状态" clearable style="width: 140px">
+        <el-select v-model="query.auditStatus" placeholder="审核状态" clearable style="width: 140px">
           <el-option label="待审核" :value="0" />
           <el-option label="已通过" :value="1" />
           <el-option label="已驳回" :value="2" />
@@ -99,8 +99,8 @@
 
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleView(row)">查看</el-button>
-            <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+            <el-button link type="primary" @click="openView(row)">查看</el-button>
+            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -108,9 +108,9 @@
 
       <div class="pagination-wrapper">
         <el-pagination
-          v-model:current-page="pagination.currentPage"
-          v-model:page-size="pagination.pageSize"
-          :total="pagination.total"
+          v-model:current-page="query.page"
+          v-model:page-size="query.pageSize"
+          :total="total"
           layout="total, sizes, prev, pager, next, jumper"
           @size-change="loadData"
           @current-change="loadData"
@@ -119,9 +119,9 @@
     </el-card>
 
     <HospitalDialog
-      v-model="dialog.visible"
-      :is-edit="dialog.isEdit"
-      :data="dialog.data"
+      v-model="editDialog.visible"
+      :is-edit="editDialog.isEdit"
+      :data="editDialog.data"
       @submit="submitData"
     />
 
@@ -130,10 +130,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { ArrowLeft, Plus, Search } from '@element-plus/icons-vue'
+import { useTable, useCrudDialog } from '@/composables'
 import type { HospitalForm, HospitalItem } from '@/api/resource/medical/hospital'
 import {
   addHospital,
@@ -145,9 +145,16 @@ import {
 import HospitalDialog from './components/HospitalDialog.vue'
 import HospitalViewDialog from './components/HospitalViewDialog.vue'
 
+type HospitalQuery = {
+  page: number
+  pageSize: number
+  keyword: string
+  level: string
+  isRareNetwork: '' | number
+  auditStatus: '' | number
+}
+
 const router = useRouter()
-const loading = ref(false)
-const tableData = ref<HospitalItem[]>([])
 
 const levelOptions = [
   { label: '三甲', value: '1' },
@@ -156,37 +163,57 @@ const levelOptions = [
   { label: '二甲', value: '4' },
   { label: '二乙', value: '5' },
   { label: '二丙', value: '6' },
-  { label: '其他', value: '7' }
+  { label: '其他', value: '7' },
 ]
 
-const pagination = reactive({
-  currentPage: 1,
-  pageSize: 10,
-  total: 0,
+const { loading, tableData, total, query, loadData, handleSearch, handleReset, refresh } = useTable<
+  HospitalItem,
+  HospitalQuery
+>({
+  initialQuery: () => ({
+    page: 1,
+    pageSize: 10,
+    keyword: '',
+    level: '',
+    isRareNetwork: '',
+    auditStatus: '',
+  }),
+  fetchApi: async (params) => {
+    const res = await getHospitalList({
+      page: params.page,
+      pageSize: params.pageSize,
+      keyword: params.keyword || undefined,
+      level: params.level || undefined,
+      isRareNetwork: params.isRareNetwork,
+      auditStatus: params.auditStatus,
+    })
+    return res.data
+  },
+  errorMessage: '加载医院列表失败',
 })
 
-const filters = reactive({
-  keyword: '',
-  level: '',
-  isRareNetwork: '' as '' | number,
-  auditStatus: '' as '' | number,
+const {
+  editDialog,
+  viewDialog,
+  openAdd,
+  openEdit,
+  openView,
+  handleDelete,
+} = useCrudDialog<HospitalItem>({
+  strategy: 'byData',
+  getRowId: (row) => row.id,
+  fetchDetail: async (id) => {
+    const res = await getHospitalDetail(id)
+    return res.data
+  },
+  deleteItem: (row) => deleteHospital(row.id),
+  deleteMessage: (row) => `确定删除医院「${row.name}」吗？`,
+  deleteTitle: '删除确认',
+  onSuccess: refresh,
 })
 
-const dialog = reactive({
-  visible: false,
-  isEdit: false,
-  data: null as HospitalItem | null,
-})
-
-const viewDialog = reactive({
-  visible: false,
-  data: null as HospitalItem | null,
-})
-
-// 【修改 2】根据 value (字符串) 获取 label (汉字)
 const getLevelText = (level: string | number) => {
-  // 确保比较时转为字符串，兼容可能的数字类型
-  const option = levelOptions.find(item => item.value === String(level))
+  const option = levelOptions.find((item) => item.value === String(level))
   return option ? option.label : '-'
 }
 
@@ -204,7 +231,8 @@ const getAuditTagType = (status: number) => {
   return map[status] || 'info'
 }
 
-const formatRegion = (row: HospitalItem) => [row.provinceName, row.cityName, row.districtName].filter(Boolean).join(' / ') || '-'
+const formatRegion = (row: HospitalItem) =>
+  [row.provinceName, row.cityName, row.districtName].filter(Boolean).join(' / ') || '-'
 
 const formatDateTime = (value?: string) => {
   if (!value) return '-'
@@ -213,99 +241,21 @@ const formatDateTime = (value?: string) => {
 
 const handleBack = () => router.push('/resource/medical')
 
-const handleAdd = () => {
-  dialog.isEdit = false
-  dialog.data = null
-  dialog.visible = true
-}
-
-const handleEdit = async (row: HospitalItem) => {
-  try {
-    const res = await getHospitalDetail(row.id)
-    dialog.isEdit = true
-    dialog.data = res.data
-    dialog.visible = true
-  } catch {
-    ElMessage.error('获取医院详情失败')
-  }
-}
-
-const handleView = async (row: HospitalItem) => {
-  try {
-    const res = await getHospitalDetail(row.id)
-    viewDialog.data = res.data
-    viewDialog.visible = true
-  } catch {
-    ElMessage.error('获取医院详情失败')
-  }
-}
-
-const handleDelete = async (row: HospitalItem) => {
-  await ElMessageBox.confirm(`确定删除医院“${row.name}”吗？`, '删除确认', {
-    type: 'warning',
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-  })
-  try {
-    await deleteHospital(row.id)
-    ElMessage.success('删除成功')
-    await loadData()
-  } catch {
-    ElMessage.error('删除失败')
-  }
-}
-
 const submitData = async (formData: HospitalForm) => {
   try {
-    if (dialog.isEdit && formData.id) {
+    if (editDialog.value.isEdit && formData.id) {
       await updateHospital(formData.id, formData)
       ElMessage.success('编辑成功')
     } else {
       await addHospital(formData)
       ElMessage.success('新增成功')
     }
-    dialog.visible = false
-    await loadData()
+    editDialog.value.visible = false
+    await refresh()
   } catch {
     ElMessage.error('保存失败')
   }
 }
-
-const handleSearch = () => {
-  pagination.currentPage = 1
-  loadData()
-}
-
-const handleReset = () => {
-  filters.keyword = ''
-  filters.level = ''
-  filters.isRareNetwork = ''
-  filters.auditStatus = ''
-  pagination.currentPage = 1
-  loadData()
-}
-
-const loadData = async () => {
-  loading.value = true
-  try {
-    const res = await getHospitalList({
-      page: pagination.currentPage,
-      pageSize: pagination.pageSize,
-      keyword: filters.keyword || undefined,
-      level: filters.level || undefined,
-      isRareNetwork: filters.isRareNetwork,
-      auditStatus: filters.auditStatus,
-    })
-    tableData.value = res.data.list || []
-    pagination.total = res.data.total || 0
-  } catch {
-    ElMessage.error('加载医院列表失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(loadData)
 </script>
 
 <style scoped lang="scss">

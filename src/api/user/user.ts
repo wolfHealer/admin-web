@@ -1,11 +1,7 @@
 import request from '@/utils/request'
+import type { ApiResponse } from '@/types/api'
 
 
-export interface ApiResponse<T = any> {
-  code: number
-  data: T
-  message?: string
-}
 
 
 
@@ -112,18 +108,18 @@ export interface UserItem {
 
 
 // 登录接口
-export const userLoginService = ({ phone, password }: { phone: string, password: string }): Promise<LoginResponse> => {
-  return request.post('/auth/login', { phone, password })
+export const userLoginService = ({ phone, password }: { phone: string, password: string }) => {
+  return request.post<LoginResponse>('/auth/login', { phone, password })
 }
 
 // 注册接口
-export const userRegisterService = (data: RegisterData): Promise<void> => {
-  return request.post('/auth/register', data)
+export const userRegisterService = (data: RegisterData) => {
+  return request.post<null>('/auth/register', data)
 }
 
 // 获取用户信息接口
-export const userGetInfoService = (): Promise<{ data: { data: UserInfo } }> => {
-  return request.get('/auth/userinfo')
+export const userGetInfoService = () => {
+  return request.get<UserInfo>('/auth/userinfo')
 }
 
 
@@ -133,7 +129,7 @@ export const userGetInfoService = (): Promise<{ data: { data: UserInfo } }> => {
  * @param params 查询参数
  */
 export const getUserList = (params: UserListParams) => {
-  return request<ApiResponse<UserListResponse>>({
+  return request<UserListResponse>({
     url: '/system/users',
     method: 'get',
     params,
@@ -145,7 +141,7 @@ export const getUserList = (params: UserListParams) => {
  * @param id 用户ID
  */
 export const getUserDetail = (id: number) => {
-  return request<ApiResponse<UserItem>>({
+  return request<UserItem>({
     url: `/system/users/${id}`,
     method: 'get',
   })
@@ -156,7 +152,7 @@ export const getUserDetail = (id: number) => {
  * @param data 用户数据
  */
 export const addUser = (data: Partial<UserForm>) => {
-  return request<ApiResponse>({
+  return request<null>({
     url: '/system/users',
     method: 'post',
     data,
@@ -170,7 +166,7 @@ export const addUser = (data: Partial<UserForm>) => {
  */
 
 export const updateUser = (id: number, data: Partial<UserForm>) => {
-  return request<ApiResponse>({
+  return request<null>({
     url: `/system/users/${id}`,
     method: 'put',
     data,
@@ -181,13 +177,13 @@ export const updateUser = (id: number, data: Partial<UserForm>) => {
  * 删除用户
  * @param id 用户ID
  */
-export const deleteUser = (id: number): Promise<{ code: number, message: string }> => {
-  return request.delete(`/users/${id}`)
+export const deleteUser = (id: number): Promise<ApiResponse<null>> => {
+  return request.delete(`/system/users/${id}`)
 }
 
 
 export const resetUserPassword = (id: number, newPassword: string) => {
-  return request<ApiResponse>({
+  return request<null>({
     url: `/system/users/${id}/reset-password`,
     method: 'post',
     data: { newPassword },
@@ -196,7 +192,7 @@ export const resetUserPassword = (id: number, newPassword: string) => {
 
 
 export const updateUserRole = (id: number, role: UserRole) => {
-  return request<ApiResponse>({
+  return request<null>({
     url: `/system/users/${id}/role`,
     method: 'patch',
     data: { role },
@@ -205,7 +201,7 @@ export const updateUserRole = (id: number, role: UserRole) => {
 
 
 export const updateUserStatus = (id: number, status: UserStatus) => {
-  return request<ApiResponse>({
+  return request<null>({
     url: `/system/users/${id}/status`,
     method: 'patch',
     data: { status },

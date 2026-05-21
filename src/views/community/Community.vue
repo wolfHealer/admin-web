@@ -7,7 +7,7 @@
           <span>病友交流管理</span>
           <div class="header-actions">
             <el-input
-              v-model="filters.keyword"
+              v-model="query.keyword"
               placeholder="搜索用户或内容"
               clearable
               style="width: 200px"
@@ -27,14 +27,14 @@
         </div>
       </template>
 
-      <!-- 帖子列表 -->
       <el-table :data="tableData" v-loading="loading">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="displayName" label="作者" width="120" />
         <el-table-column label="内容预览" min-width="300" show-overflow-tooltip>
           <template #default="{ row }">
             <div class="content-preview">
-              {{ truncateContent(row.content) }}
+              <div><strong>{{ row.title }}</strong></div>
+              <div>{{ truncateContent(row.content) }}</div>
             </div>
           </template>
         </el-table-column>
@@ -42,16 +42,18 @@
           <template #default="{ row }">
             <el-image
               v-if="row.images && row.images.length > 0"
-              :src="row.images[0]"
-              :preview-src-list="row.images"
+              :src="row.images[0]?.trim()"
+              :preview-src-list="row.images.map((img: string) => img.trim())"
               fit="cover"
               style="width: 60px; height: 60px; cursor: pointer"
             />
             <span v-else>-</span>
           </template>
         </el-table-column>
+        <el-table-column prop="viewCount" label="浏览量" width="80" />
         <el-table-column prop="likeCount" label="点赞数" width="80" />
         <el-table-column prop="commentCount" label="评论数" width="80" />
+        <el-table-column prop="favoriteCount" label="收藏数" width="80" />
         <el-table-column prop="createdAt" label="发布时间" width="180">
           <template #default="{ row }">
             {{ formatDateTime(row.createdAt) }}
@@ -66,178 +68,121 @@
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
       <div class="pagination-wrapper">
         <el-pagination
-          v-model:current-page="pagination.currentPage"
-          v-model:page-size="pagination.pageSize"
-          :total="pagination.total"
+          v-model:current-page="query.page"
+          v-model:page-size="query.pageSize"
+          :total="total"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSearch"
-          @current-change="handleSearch"
+          @size-change="loadData"
+          @current-change="loadData"
         />
       </div>
     </el-card>
 
-    <!-- 帖子详情/评论管理弹窗 -->
     <PostDetailDialog
       v-model="detailDialog.visible"
       :post-data="detailDialog.postData"
       :is-edit="detailDialog.isEdit"
       @close="handleDetailClose"
-      @refresh="loadData"
+      @refresh="refresh"
     />
-    <!-- 发布帖子弹窗（新增） -->
     <PostCreateDialog
       v-model="createDialog.visible"
-      @success="loadData"
+      @success="refresh"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
-import { 
-  getPostList,
-  deletePost
-} from '@/api/community/post'
+import { Search, Plus } from '@element-plus/icons-vue'
+import { useTable } from '@/composables/useTable'
+import { getPostList, deletePost, type PostItem } from '@/api/community/post'
 import PostDetailDialog from './components/PostDetailDialog.vue'
-import PostCreateDialog from './components/PostCreateDialog.vue'  // 新增
+import PostCreateDialog from './components/PostCreateDialog.vue'
 
-
-const createDialog = reactive({
-  visible: false
-})
-
-// 发布帖子
-const handleCreate = () => {
-  createDialog.visible = true
-}
-
-interface PostItem {
-  id: number
-  userId: number
-  displayName: string
-  content: string
-  images: string[]
-  likeCount: number
-  commentCount: number
-  isLiked: boolean
-  createdAt: string
-}
-
-const loading = ref(false)
-const tableData = ref<PostItem[]>([])
-
-const pagination = reactive({
-  currentPage: 1,
-  pageSize: 10,
-  total: 0
-})
-
-const filters = reactive({
-  keyword: ''
-})
+const createDialog = reactive({ visible: false })
 
 const detailDialog = reactive({
   visible: false,
   postData: null as PostItem | null,
-  isEdit: false
+  isEdit: false,
 })
 
-// 截断内容显示
-const truncateContent = (content: string, length: number = 100) => {
+const { loading, tableData, total, query, loadData, handleSearch, handleReset, refresh } = useTable<
+  PostItem,
+  { page: number; pageSize: number; keyword: string }
+>({
+  initialQuery: () => ({
+    page: 1,
+    pageSize: 10,
+    keyword: '',
+  }),
+  fetchApi: async (params) => {
+    const res = await getPostList({
+      ...params,
+      keyword: params.keyword || undefined,
+      sort: 'latest',
+    })
+    return res.data
+  },
+  errorMessage: '加载列表失败',
+})
+
+const truncateContent = (content: string, length = 100) => {
   if (!content) return ''
-  return content.length > length ? content.substring(0, length) + '...' : content
+  return content.length > length ? `${content.substring(0, length)}...` : content
 }
 
-// 格式化时间
 const formatDateTime = (dateStr: string) => {
   if (!dateStr) return '-'
-  const date = new Date(dateStr)
-  return date.toLocaleString('zh-CN', {
+  return new Date(dateStr).toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   })
 }
 
-// 搜索
-const handleSearch = () => {
-  pagination.currentPage = 1
-  loadData()
+const handleCreate = () => {
+  createDialog.visible = true
 }
 
-// 重置
-const handleReset = () => {
-  filters.keyword = ''
-  handleSearch()
-}
-
-// 加载数据
-const loadData = async () => {
-  loading.value = true
-  try {
-    const res = await getPostList({
-      page: pagination.currentPage,
-      pageSize: pagination.pageSize,
-      ...filters
-    })
-    if ((res as any).code === 200 && (res as any).data) {
-      tableData.value = (res as any).data.records || []
-      pagination.total = (res as any).data.total || 0
-    }
-  } catch (error) {
-    ElMessage.error('加载列表失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-// 查看详情
 const handleView = (row: PostItem) => {
   detailDialog.postData = row
   detailDialog.isEdit = false
   detailDialog.visible = true
 }
 
-// 修改帖子
 const handleEdit = (row: PostItem) => {
   detailDialog.postData = row
   detailDialog.isEdit = true
   detailDialog.visible = true
 }
 
-// 关闭详情弹窗
 const handleDetailClose = () => {
   detailDialog.visible = false
   detailDialog.postData = null
   detailDialog.isEdit = false
 }
 
-// 删除
 const handleDelete = async (row: PostItem) => {
-  await ElMessageBox.confirm(`确定要删除该帖子吗？`, '提示', {
+  await ElMessageBox.confirm('确定要删除该帖子吗？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
-    type: 'warning'
+    type: 'warning',
   })
   try {
     await deletePost(row.id)
     ElMessage.success('删除成功')
-    loadData()
-  } catch (error) {
+    refresh()
+  } catch {
     ElMessage.error('删除失败')
   }
 }
-
-onMounted(() => {
-  loadData()
-})
 </script>
 
 <style lang="scss" scoped>

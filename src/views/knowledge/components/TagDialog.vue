@@ -74,14 +74,14 @@ const resetForm = () => {
 }
 
 watch(
-  () => [props.data, props.isEdit],
-  ([newData]) => {
-    if (newData && props.isEdit) {
-      formData.id = newData.id
-      formData.name = newData.name
-      formData.code = newData.code
-      formData.sortOrder = newData.sortOrder || 0
-      formData.status = newData.status ?? 1
+  () => ({ data: props.data, isEdit: props.isEdit }),
+  ({ data, isEdit }) => {
+    if (data && isEdit) {
+      formData.id = data.id
+      formData.name = data.name
+      formData.code = data.code
+      formData.sortOrder = data.sortOrder || 0
+      formData.status = data.status ?? 1
     } else {
       resetForm()
     }

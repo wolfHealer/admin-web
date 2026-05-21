@@ -120,6 +120,8 @@ import {
   getRegionTree, 
   searchDiseaseOptions, 
   updatePsychOrg,
+  type PsychOrgForm,
+  type PsychOrgItem,
   type RegionTreeNode,
   type DiseaseOption
 } from '@/api/resource/rehab/psychologicalOrg'
@@ -161,7 +163,7 @@ const defaultForm = () => ({
   contactPhone: '',
   contactUrl: '',
   isFree: false,
-  consultWay: 'both',
+  consultWay: 'both' as PsychOrgItem['consultWay'],
   contentIntro: '',
   auditStatus: 0 as 0 | 1 | 2,
   rejectReason: '',
@@ -262,8 +264,7 @@ const resolveRegionCodesFromNames = () => {
 const searchDiseases = async (keyword: string) => {
   diseaseLoading.value = true
   try {
-    const res = await searchDiseaseOptions(keyword)
-    const list = (res.data as any)?.list || res.data || []
+    const list = await searchDiseaseOptions(keyword)
     
     // 保留已选中的疾病，防止搜索后消失
     const selected = diseaseOptions.value.filter(item => formData.diseaseIds.includes(item.id))
@@ -327,8 +328,7 @@ const open = async (type: 'create' | 'update', id?: number) => {
            }
          })
       }
-    } catch (error) {
-      console.error(error)
+    } catch {
       ElMessage.error('获取详情异常')
     }
   }
@@ -347,7 +347,7 @@ const submit = async () => {
   loading.value = true
   try {
     // 构造提交 payload，只包含后端需要的字段
-    const payload = {
+    const payload: PsychOrgForm = {
       id: formData.id,
       name: formData.name,
       provinceCode: formData.provinceCode,
@@ -359,8 +359,8 @@ const submit = async () => {
       address: formData.address,
       contactPhone: formData.contactPhone,
       contactUrl: formData.contactUrl,
-      isFree: formData.isFree,
-      consultWay: formData.consultWay,
+      isFree: formData.isFree ? 1 : 0,
+      consultWay: formData.consultWay as PsychOrgItem['consultWay'],
       contentIntro: formData.contentIntro,
       auditStatus: formData.auditStatus,
       rejectReason: formData.rejectReason,

@@ -1,7 +1,62 @@
+<script setup lang="ts">
+import { useRouter } from 'vue-router'
+import { ArrowLeft, Plus } from '@element-plus/icons-vue'
+import { useTable, useCrudDialog } from '@/composables'
+import CaseShareDialog from './components/CaseShareDialog.vue'
+import CaseShareViewDialog from './components/CaseShareViewDialog.vue'
+import {
+  deleteReliefCase,
+  getReliefCaseList,
+  type ReliefCaseItem,
+  type ReliefCaseListParams,
+} from '@/api/resource/charity/case'
+
+const router = useRouter()
+
+const auditText = (status: number) => (status === 1 ? '已通过' : status === 2 ? '已驳回' : '待审核')
+const auditTagType = (status: number) => (status === 1 ? 'success' : status === 2 ? 'danger' : 'warning')
+
+const { loading, tableData, total, query, handleSearch, handleReset, refresh } = useTable<
+  ReliefCaseItem,
+  ReliefCaseListParams
+>({
+  initialQuery: () => ({
+    page: 1,
+    pageSize: 10,
+    keyword: '',
+    diseaseId: '',
+    projectId: '',
+    auditStatus: '',
+  }),
+  fetchApi: async (params) => {
+    const res = await getReliefCaseList(params)
+    return res.data
+  },
+  errorMessage: '加载案例列表失败',
+})
+
+const {
+  currentId,
+  dialogVisible,
+  viewVisible,
+  openAdd,
+  openEdit,
+  openView,
+  handleDelete,
+} = useCrudDialog<ReliefCaseItem>({
+  strategy: 'byId',
+  getRowId: (row) => row.id,
+  deleteItem: (row) => deleteReliefCase(row.id),
+  deleteMessage: (row) => `确认删除「${row.caseTitle}」吗？`,
+  onSuccess: refresh,
+})
+
+const handleBack = () => router.push('/resource/charity')
+</script>
+
 <template>
   <div class="page-container">
     <el-card shadow="never" class="search-card">
-      <!-- 新增 Header 插槽 -->
       <template #header>
         <div class="card-header">
           <div class="header-left">
@@ -11,18 +66,17 @@
             </el-button>
             <span class="page-title">案例分享库</span>
           </div>
-          <!-- 可选：将新增按钮移到这里，或者保留在下方 -->
-          <el-button type="primary" @click="handleAdd">
-             <el-icon><Plus /></el-icon>
-             新增案例
+          <el-button type="primary" @click="openAdd">
+            <el-icon><Plus /></el-icon>
+            新增案例
           </el-button>
         </div>
       </template>
 
-      <el-form :inline="true" :model="queryParams">
+      <el-form :inline="true" :model="query">
         <el-form-item label="关键词">
           <el-input
-            v-model="queryParams.keyword"
+            v-model="query.keyword"
             placeholder="请输入案例标题"
             clearable
             @keyup.enter="handleSearch"
@@ -30,7 +84,7 @@
         </el-form-item>
 
         <el-form-item label="审核状态">
-          <el-select v-model="queryParams.auditStatus" placeholder="全部" clearable style="width: 140px">
+          <el-select v-model="query.auditStatus" placeholder="全部" clearable style="width: 140px">
             <el-option label="待审核" :value="0" />
             <el-option label="已通过" :value="1" />
             <el-option label="已驳回" :value="2" />
@@ -59,12 +113,11 @@
             </el-tag>
           </template>
         </el-table-column>
-        <!-- 修改点：将 updated_at 改为 updatedAt 以匹配后端返回的 camelCase 字段 -->
         <el-table-column prop="updatedAt" label="更新时间" width="180" />
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleView(row)">查看</el-button>
-            <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+            <el-button link type="primary" @click="openView(row)">查看</el-button>
+            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -72,130 +125,29 @@
 
       <div class="pagination-wrap">
         <el-pagination
-          v-model:current-page="queryParams.page"
-          v-model:page-size="queryParams.pageSize"
+          v-model:current-page="query.page"
+          v-model:page-size="query.pageSize"
           :page-sizes="[10, 20, 50]"
           :total="total"
           layout="total, sizes, prev, pager, next, jumper"
-          @size-change="getList"
-          @current-change="getList"
+          @size-change="refresh"
+          @current-change="refresh"
         />
       </div>
     </el-card>
 
     <CaseShareDialog
       v-model="dialogVisible"
-      :id="currentId"
-      @success="getList"
+      :id="currentId ?? null"
+      @success="refresh"
     />
 
     <CaseShareViewDialog
       v-model="viewVisible"
-      :id="currentId"
+      :id="currentId ?? null"
     />
   </div>
 </template>
-
-<script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Plus } from '@element-plus/icons-vue'
-import CaseShareDialog from './components/CaseShareDialog.vue'
-import CaseShareViewDialog from './components/CaseShareViewDialog.vue'
-import {
-  deleteReliefCase,
-  getReliefCaseList,
-  type ReliefCaseItem,
-  type ReliefCaseListParams,
-} from '@/api/resource/charity/case'
-
-const router = useRouter()
-
-const loading = ref(false)
-const tableData = ref<ReliefCaseItem[]>([])
-const total = ref(0)
-
-const dialogVisible = ref(false)
-const viewVisible = ref(false)
-const currentId = ref<number | null>(null)
-
-const queryParams = reactive<ReliefCaseListParams>({
-  page: 1,
-  pageSize: 10,
-  keyword: '',
-  diseaseId: '',
-  projectId: '',
-  auditStatus: '',
-})
-
-const auditText = (status: number) => {
-  return status === 1 ? '已通过' : status === 2 ? '已驳回' : '待审核'
-}
-
-const auditTagType = (status: number) => {
-  return status === 1 ? 'success' : status === 2 ? 'danger' : 'warning'
-}
-
-const getList = async () => {
-  loading.value = true
-  try {
-    const res = await getReliefCaseList(queryParams)
-    // 确保数据结构匹配: res.data.list 和 res.data.total
-    tableData.value = res.data?.list || []
-    total.value = res.data?.total || 0
-  } finally {
-    loading.value = false
-  }
-}
-
-const handleBack = () => {
-  router.push('/resource/charity')
-}
-
-const handleSearch = () => {
-  queryParams.page = 1
-  getList()
-}
-
-const handleReset = () => {
-  queryParams.page = 1
-  queryParams.pageSize = 10
-  queryParams.keyword = ''
-  queryParams.diseaseId = ''
-  queryParams.projectId = ''
-  queryParams.auditStatus = ''
-  getList()
-}
-
-const handleAdd = () => {
-  currentId.value = null
-  dialogVisible.value = true
-}
-
-const handleEdit = (row: ReliefCaseItem) => {
-  currentId.value = row.id
-  dialogVisible.value = true
-}
-
-const handleView = (row: ReliefCaseItem) => {
-  currentId.value = row.id
-  viewVisible.value = true
-}
-
-const handleDelete = async (row: ReliefCaseItem) => {
-  await ElMessageBox.confirm(`确认删除“${row.caseTitle}”吗？`, '提示', {
-    type: 'warning',
-  })
-  await deleteReliefCase(row.id)
-  ElMessage.success('删除成功')
-  getList()
-}
-
-onMounted(() => {
-  getList()
-})
-</script>
 
 <style scoped>
 .page-container {

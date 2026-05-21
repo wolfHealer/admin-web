@@ -19,10 +19,9 @@
           <div class="toolbar">
             <!-- ... 筛选栏保持不变 ... -->
             <div class="filter-bar">
-              <el-input v-model="projectFilters.keyword" placeholder="搜索项目名称" clearable style="width: 220px" @clear="loadProjects" />
-              <el-input v-model="projectFilters.organizer" placeholder="主办方" clearable style="width: 180px" />
-              <!-- 注意：如果接口不支持按状态筛选，这里可能需要移除或调整 -->
-              <el-select v-model="projectFilters.audit_status" placeholder="审核状态" clearable style="width: 140px">
+              <el-input v-model="projectQuery.keyword" placeholder="搜索项目名称" clearable style="width: 220px" @clear="handleProjectSearch" />
+              <el-input v-model="projectQuery.organizer" placeholder="主办方" clearable style="width: 180px" />
+              <el-select v-model="projectQuery.auditStatus" placeholder="审核状态" clearable style="width: 140px">
                 <el-option label="待审核" :value="0" />
                 <el-option label="已通过" :value="1" />
                 <el-option label="已驳回" :value="2" />
@@ -80,9 +79,9 @@
 
           <div class="pagination-wrapper">
             <el-pagination
-              v-model:current-page="projectPagination.currentPage"
-              v-model:page-size="projectPagination.pageSize"
-              :total="projectPagination.total"
+              v-model:current-page="projectQuery.page"
+              v-model:page-size="projectQuery.pageSize"
+              :total="projectTotal"
               layout="total, sizes, prev, pager, next, jumper"
               @size-change="loadProjects"
               @current-change="loadProjects"
@@ -95,8 +94,8 @@
            <!-- ... 内容同上，无需修改 ... -->
            <div class="toolbar">
             <div class="filter-bar">
-              <el-input v-model="applicationFilters.keyword" placeholder="搜索患者姓名 / 电话" clearable style="width: 220px" @clear="loadApplications" />
-              <el-select v-model="applicationFilters.status" placeholder="申请状态" clearable style="width: 140px">
+              <el-input v-model="applicationQuery.keyword" placeholder="搜索患者姓名 / 电话" clearable style="width: 220px" @clear="handleApplicationSearch" />
+              <el-select v-model="applicationQuery.status" placeholder="申请状态" clearable style="width: 140px">
                 <el-option label="待审核" value="pending" />
                 <el-option label="已通过" value="approved" />
                 <el-option label="已驳回" value="rejected" />
@@ -134,9 +133,9 @@
 
           <div class="pagination-wrapper">
             <el-pagination
-              v-model:current-page="applicationPagination.currentPage"
-              v-model:page-size="applicationPagination.pageSize"
-              :total="applicationPagination.total"
+              v-model:current-page="applicationQuery.page"
+              v-model:page-size="applicationQuery.pageSize"
+              :total="applicationTotal"
               layout="total, sizes, prev, pager, next, jumper"
               @size-change="loadApplications"
               @current-change="loadApplications"
@@ -146,7 +145,6 @@
       </el-tabs>
     </el-card>
 
-    <!-- ... Dialogs 保持不变 ... -->
     <DonationProjectDialog v-model="projectDialog.visible" :edit-data="projectDialog.data" @submit="submitProjectData" />
     <DonationProjectViewDialog v-model="projectViewDialog.visible" :view-data="projectViewDialog.data" />
     <ReliefApplicationDialog v-model="applicationDialog.visible" :edit-data="applicationDialog.data" @submit="submitApplicationData" />
@@ -155,10 +153,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Plus } from '@element-plus/icons-vue'
+import { useTable, useCrudDialog } from '@/composables'
 import {
   addReliefApplication,
   addReliefProject,
@@ -173,253 +172,247 @@ import {
   updateReliefApplication,
   updateReliefProject,
   type ReliefApplicationItem,
-  // 注意：这里可能需要更新 ReliefProjectItem 的定义以匹配新接口，或者使用 any 临时规避
-  type ReliefProjectItem 
+  type DonationProjectForm,
+  type ReliefProjectItem,
 } from '@/api/resource/drug/donationProject'
 import DonationProjectDialog from './components/DonationProjectDialog.vue'
 import DonationProjectViewDialog from './components/DonationProjectViewDialog.vue'
 import ReliefApplicationDialog from './components/ReliefApplicationDialog.vue'
 import ReliefApplicationViewDialog from './components/ReliefApplicationViewDialog.vue'
 
+type ReliefProjectRow = ReliefProjectItem
+
+type ProjectQuery = {
+  page: number
+  pageSize: number
+  keyword: string
+  organizer: string
+  auditStatus: number | null
+}
+
+type ApplicationQuery = {
+  page: number
+  pageSize: number
+  keyword: string
+  status: string | null
+}
+
 const router = useRouter()
 const activeTab = ref<'project' | 'application'>('project')
 
-const projectLoading = ref(false)
-const applicationLoading = ref(false)
-// 如果类型不匹配，可以先暂时断言为 any[] 调试，或者更新 API 类型定义
-const projectTableData = ref<any[]>([]) 
-const applicationTableData = ref<ReliefApplicationItem[]>([])
+const {
+  loading: projectLoading,
+  tableData: projectTableData,
+  total: projectTotal,
+  query: projectQuery,
+  loadData: loadProjects,
+  handleSearch: handleProjectSearch,
+  handleReset: handleProjectReset,
+  refresh: refreshProjects,
+} = useTable<ReliefProjectRow, ProjectQuery>({
+  initialQuery: () => ({
+    page: 1,
+    pageSize: 10,
+    keyword: '',
+    organizer: '',
+    auditStatus: null,
+  }),
+  fetchApi: async (params) => {
+    const res = await getReliefProjectList({
+      page: params.page,
+      pageSize: params.pageSize,
+      keyword: params.keyword || undefined,
+      organizer: params.organizer || undefined,
+      auditStatus: params.auditStatus ?? undefined,
+    })
+    return res.data
+  },
+  errorMessage: '加载项目列表失败',
+})
 
-const projectPagination = reactive({ currentPage: 1, pageSize: 10, total: 0 })
-const applicationPagination = reactive({ currentPage: 1, pageSize: 10, total: 0 })
+const {
+  loading: applicationLoading,
+  tableData: applicationTableData,
+  total: applicationTotal,
+  query: applicationQuery,
+  loadData: loadApplications,
+  handleSearch: handleApplicationSearch,
+  handleReset: handleApplicationReset,
+  refresh: refreshApplications,
+} = useTable<ReliefApplicationItem, ApplicationQuery>({
+  immediate: false,
+  initialQuery: () => ({
+    page: 1,
+    pageSize: 10,
+    keyword: '',
+    status: null,
+  }),
+  fetchApi: async (params) => {
+    const res = await getReliefApplicationList({
+      page: params.page,
+      pageSize: params.pageSize,
+      keyword: params.keyword || undefined,
+      status: params.status ?? undefined,
+    })
+    return res.data
+  },
+  errorMessage: '加载申请列表失败',
+})
 
-const projectFilters = reactive({ keyword: '', organizer: '', audit_status: null as number | null })
-const applicationFilters = reactive({ keyword: '', status: null as string | null })
+const {
+  editDialog: projectDialog,
+  viewDialog: projectViewDialog,
+  openAdd: handleProjectAdd,
+  openEdit: handleProjectEdit,
+  openView: handleProjectView,
+  handleDelete: handleProjectDelete,
+} = useCrudDialog<ReliefProjectRow>({
+  strategy: 'byData',
+  getRowId: (row) => row.id,
+  fetchDetail: async (id) => (await getReliefProjectDetail(id)).data,
+  deleteItem: (row) => deleteReliefProject(row.id!),
+  deleteMessage: (row) => `确定删除项目「${row.name}」吗？`,
+  onSuccess: refreshProjects,
+})
 
-const projectDialog = reactive({ visible: false, data: null as any })
-const projectViewDialog = reactive({ visible: false, data: null as any })
-const applicationDialog = reactive({ visible: false, data: null as ReliefApplicationItem | null })
-const applicationViewDialog = reactive({ visible: false, data: null as ReliefApplicationItem | null })
+const {
+  editDialog: applicationDialog,
+  openAdd: handleApplicationAdd,
+  openEdit: handleApplicationEdit,
+  handleDelete: handleApplicationDelete,
+} = useCrudDialog<ReliefApplicationItem>({
+  strategy: 'byData',
+  getRowId: (row) => row.id,
+  fetchDetail: async (id) => (await getReliefApplicationDetail(id)).data,
+  deleteItem: (row) => deleteReliefApplication(row.id!),
+  deleteMessage: (row) => `确定删除申请「${row.patientName}」吗？`,
+  onSuccess: refreshApplications,
+})
 
+const applicationViewDialog = ref<{
+  visible: boolean
+  data: (ReliefApplicationItem & { logs?: ReliefApplicationItem['logs'] }) | null
+}>({
+  visible: false,
+  data: null,
+})
 
-
-// ... 其他导入和逻辑保持不变 ...
-
-// 【新增】日期格式化函数
 const formatDate = (dateStr: string | undefined | null) => {
-  if (!dateStr) return '-';
+  if (!dateStr) return '-'
   try {
-    const date = new Date(dateStr);
-    // 格式化为 YYYY-MM-DD HH:mm:ss
-    return date.toLocaleString('zh-CN', { 
-      year: 'numeric', 
-      month: '2-digit', 
-      day: '2-digit', 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit',
-      hour12: false 
-    }).replace(/\//g, '-');
-  } catch (e) {
-    return dateStr; // 如果解析失败，返回原字符串
+    const date = new Date(dateStr)
+    return date
+      .toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      })
+      .replace(/\//g, '-')
+  } catch {
+    return dateStr
   }
 }
-
-
-// ... 其他函数保持不变 ...
 
 watch(activeTab, (val) => {
   if (val === 'project') loadProjects()
   else loadApplications()
 })
 
-onMounted(() => {
-  loadProjects()
-})
-
 const handleBack = () => router.push('/resource/drug')
 
-const loadProjects = async () => {
-  projectLoading.value = true
-  try {
-    const res = await getReliefProjectList({
-      page: projectPagination.currentPage,
-      pageSize: projectPagination.pageSize,
-      keyword: projectFilters.keyword || undefined,
-      organizer: projectFilters.organizer || undefined,
-      auditStatus: projectFilters.audit_status
-    })
-    
-    // 关键修改：根据提供的 JSON 结构解析数据
-    // 假设 res 的结构是 { code: 200, data: { list: [], total: 2, page: 1 }, message: "success" }
-    const responseData = (res as any).data;
-    
-    if (responseData) {
-      projectTableData.value = responseData.list || []
-      projectPagination.total = responseData.total || 0
-      
-      // 如果需要，可以同步当前页码，防止后端返回的页码与前端不一致
-      // projectPagination.currentPage = responseData.page || 1
-    } else {
-      projectTableData.value = []
-      projectPagination.total = 0
-    }
-  } catch (error) {
-    console.error("Load projects failed:", error);
-    ElMessage.error("加载项目列表失败");
-  } finally {
-    projectLoading.value = false
-  }
-}
-
-const loadApplications = async () => {
-  applicationLoading.value = true
-  try {
-    const res = await getReliefApplicationList({
-      page: applicationPagination.currentPage,
-      pageSize: applicationPagination.pageSize,
-      keyword: applicationFilters.keyword || undefined,
-      status: applicationFilters.status
-    })
-    applicationTableData.value = (res as any).data?.list || []
-    applicationPagination.total = (res as any).data?.total || 0
-  } finally {
-    applicationLoading.value = false
-  }
-}
-
-const handleProjectSearch = () => {
-  projectPagination.currentPage = 1
-  loadProjects()
-}
-const handleProjectReset = () => {
-  Object.assign(projectFilters, { keyword: '', organizer: '', audit_status: null })
-  handleProjectSearch()
-}
-const handleProjectAdd = () => {
-  projectDialog.data = null
-  projectDialog.visible = true
-}
-
-const handleProjectEdit = async (row: any) => {
-  const res = await getReliefProjectDetail(row.id)
-  // 假设 res.data 就是接口返回的那个驼峰对象
-  projectDialog.data = (res as any).data 
-  projectDialog.visible = true
-}
-
-const handleProjectView = async (row: any) => {
-  const res = await getReliefProjectDetail(row.id)
-  projectViewDialog.data = (res as any).data
-  projectViewDialog.visible = true
-}
-const handleProjectDelete = async (row: any) => {
-  await ElMessageBox.confirm(`确定删除项目“${row.name}”吗？`, '提示', { type: 'warning' })
-  await deleteReliefProject(row.id)
-  ElMessage.success('删除成功')
-  loadProjects()
-}
-const submitProjectData = async (formData: any) => {
-  if (formData.id) await updateReliefProject(formData.id, formData)
-  else await addReliefProject(formData)
-  ElMessage.success(formData.id ? '编辑成功' : '新增成功')
-  projectDialog.visible = false
-  loadProjects()
-}
-
-const handleApplicationSearch = () => {
-  applicationPagination.currentPage = 1
-  loadApplications()
-}
-const handleApplicationReset = () => {
-  Object.assign(applicationFilters, { keyword: '', status: null })
-  handleApplicationSearch()
-}
-const handleApplicationAdd = () => {
-  applicationDialog.data = null
-  applicationDialog.visible = true
-}
-const handleApplicationEdit = async (row: ReliefApplicationItem) => {
-  const detailRes = await getReliefApplicationDetail(row.id!)
-  applicationDialog.data = (detailRes as any).data
-  applicationDialog.visible = true
-}
 const handleApplicationView = async (row: ReliefApplicationItem) => {
-  const [detailRes, logsRes] = await Promise.all([
-    getReliefApplicationDetail(row.id!),
-    getReliefApplicationLogs(row.id!)
-  ])
-  applicationViewDialog.data = {
-    ...(detailRes as any).data,
-    logs: (logsRes as any).data || []
+  try {
+    const [detailRes, logsRes] = await Promise.all([
+      getReliefApplicationDetail(row.id!),
+      getReliefApplicationLogs(row.id!),
+    ])
+    applicationViewDialog.value = {
+      visible: true,
+      data: {
+        ...detailRes.data,
+        logs: logsRes.data || [],
+      },
+    }
+  } catch {
+    ElMessage.error('获取详情失败')
   }
-  applicationViewDialog.visible = true
-}
-const handleApplicationDelete = async (row: ReliefApplicationItem) => {
-  await ElMessageBox.confirm(`确定删除申请“${row.patientName}”吗？`, '提示', { type: 'warning' })
-  await deleteReliefApplication(row.id!)
-  ElMessage.success('删除成功')
-  loadApplications()
 }
 
-
+const submitProjectData = async (formData: DonationProjectForm & { id?: number }) => {
+  try {
+    if (formData.id) await updateReliefProject(formData.id, formData)
+    else await addReliefProject(formData)
+    ElMessage.success(formData.id ? '编辑成功' : '新增成功')
+    projectDialog.value.visible = false
+    await refreshProjects()
+  } catch {
+    ElMessage.error('保存失败')
+  }
+}
 
 const handleApplicationReview = async (row: ReliefApplicationItem, status: 'approved' | 'rejected') => {
   try {
-    // 修改点：显式接收返回值，避免直接解构导致的类型推断问题
     const result = await ElMessageBox.prompt(
       status === 'approved' ? '请输入审核备注' : '请输入驳回原因',
       status === 'approved' ? '审核通过' : '审核驳回',
-      { 
-        inputType: 'textarea', 
+      {
+        inputType: 'textarea',
         inputPlaceholder: status === 'approved' ? '如：资料齐全，审核通过' : '请输入驳回原因',
         confirmButtonText: '确定',
-        cancelButtonText: '取消'
+        cancelButtonText: '取消',
       }
     )
-    
-    // 从 result.value 中获取输入内容
-    const value = result.value
 
-    // 关键修改：将参数名改为驼峰命名 (actionDesc, rejectReason) 以匹配后端接口
+    const value = typeof result === 'object' && result !== null && 'value' in result ? result.value : ''
+
     await reviewReliefApplication(row.id!, {
       status,
       actionDesc: value || (status === 'approved' ? '审核通过' : '审核驳回'),
-      rejectReason: status === 'rejected' ? (value || '') : ''
+      rejectReason: status === 'rejected' ? value || '' : '',
     })
-    
+
     ElMessage.success(status === 'approved' ? '已通过审核' : '已驳回申请')
-    loadApplications()
+    await refreshApplications()
   } catch (error) {
-    // 用户点击取消或关闭弹窗时，ElMessageBox 会抛出 'cancel' 错误，这里忽略它
     if (error !== 'cancel') {
-      console.error('审核操作失败:', error)
       ElMessage.error('操作失败')
     }
   }
 }
 
 const submitApplicationData = async (formData: ReliefApplicationItem) => {
-  if (formData.id) await updateReliefApplication(formData.id, formData)
-  else await addReliefApplication(formData)
-  ElMessage.success(formData.id ? '编辑成功' : '新增成功')
-  applicationDialog.visible = false
-  loadApplications()
+  try {
+    if (formData.id) await updateReliefApplication(formData.id, formData)
+    else await addReliefApplication(formData)
+    ElMessage.success(formData.id ? '编辑成功' : '新增成功')
+    applicationDialog.value.visible = false
+    await refreshApplications()
+  } catch {
+    ElMessage.error('保存失败')
+  }
 }
 
-// 修改辅助函数以适配可能的字段缺失或类型变化
 const auditStatusText = (status: number | undefined) => {
-  if (status === undefined || status === null) return '-';
-  return ({ 0: '待审核', 1: '已通过', 2: '已驳回' }[status] || '-')
+  if (status === undefined || status === null) return '-'
+  return ({ 0: '待审核', 1: '已通过', 2: '已驳回' } as Record<number, string>)[status] || '-'
 }
-const auditTagType = (status: number | undefined) => {
-  if (status === undefined || status === null) return 'info';
-  return ({ 0: 'warning', 1: 'success', 2: 'danger' }[status] || 'info')
-}
-const applicationStatusText = (status: string) => ({ pending: '待审核', approved: '已通过', rejected: '已驳回', completed: '已完成' }[status] || status)
-const applicationStatusType = (status: string) => ({ pending: 'warning', approved: 'success', rejected: 'danger', completed: 'info' }[status] || 'info')
 
-// 移除了 formatDrugText，因为模板中直接使用了 row.drugName
+const auditTagType = (status: number | undefined) => {
+  if (status === undefined || status === null) return 'info'
+  return ({ 0: 'warning', 1: 'success', 2: 'danger' } as Record<number, string>)[status] || 'info'
+}
+
+const applicationStatusText = (status: string) =>
+  ({ pending: '待审核', approved: '已通过', rejected: '已驳回', completed: '已完成' } as Record<string, string>)[status] ||
+  status
+
+const applicationStatusType = (status: string) =>
+  ({ pending: 'warning', approved: 'success', rejected: 'danger', completed: 'info' } as Record<string, string>)[status] ||
+  'info'
 </script>
 
 <style scoped>

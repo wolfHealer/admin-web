@@ -120,7 +120,7 @@ import {
   searchReliefProjectOptions,
   updateReliefCase,
   type DiseaseOption,
-  type ReliefCaseItem,
+  type ReliefCaseForm,
   type ReliefProjectOption,
 } from '@/api/resource/charity/case'
 
@@ -143,10 +143,9 @@ const diseaseOptions = ref<DiseaseOption[]>([])
 const projectOptions = ref<ReliefProjectOption[]>([])
 
 // 修改：默认值使用 camelCase
-const getDefaultForm = (): Partial<ReliefCaseItem> => ({
-  id: undefined,
-  diseaseId: undefined,
-  projectId: undefined,
+const getDefaultForm = (): ReliefCaseForm => ({
+  diseaseId: 0,
+  projectId: 0,
   caseTitle: '',
   patientDesc: '',
   applyCycle: '',
@@ -159,7 +158,7 @@ const getDefaultForm = (): Partial<ReliefCaseItem> => ({
   rejectReason: '',
 })
 
-const form = reactive<Partial<ReliefCaseItem>>(getDefaultForm())
+const form = reactive<ReliefCaseForm>(getDefaultForm())
 
 // 修改：校验规则 prop 使用 camelCase
 const rules: FormRules = {
@@ -180,16 +179,10 @@ const resetForm = () => {
   formRef.value?.clearValidate()
 }
 
-const normalizeList = <T>(data: { list?: T[] } | T[] | undefined): T[] => {
-  if (Array.isArray(data)) return data
-  return data?.list || []
-}
-
 const handleDiseaseSearch = async (keyword: string) => {
   diseaseLoading.value = true
   try {
-    const res = await searchDiseaseOptions(keyword)
-    diseaseOptions.value = normalizeList<DiseaseOption>(res.data)
+    diseaseOptions.value = await searchDiseaseOptions(keyword)
   } finally {
     diseaseLoading.value = false
   }
@@ -198,8 +191,7 @@ const handleDiseaseSearch = async (keyword: string) => {
 const handleProjectSearch = async (keyword: string) => {
   projectLoading.value = true
   try {
-    const res = await searchReliefProjectOptions(keyword)
-    projectOptions.value = normalizeList<ReliefProjectOption>(res.data)
+    projectOptions.value = await searchReliefProjectOptions(keyword)
   } finally {
     projectLoading.value = false
   }

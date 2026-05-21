@@ -1,12 +1,10 @@
 <template>
-  <!-- 【修改点1】确认 Dialog 组件名称。如果是 Element Plus，请使用 el-dialog -->
-  <el-dialog 
-    v-model="visible" 
-    title="机构详情" 
+  <el-dialog
+    v-model="visible"
+    title="机构详情"
     width="860px"
     :close-on-click-modal="false"
   >
-    <!-- 假设 Descriptions 也是 element-plus 的 el-descriptions，或者是你自定义的组件 -->
     <el-descriptions :column="1" border v-if="detail.id">
       <el-descriptions-item label="机构名称">{{ detail.name }}</el-descriptions-item>
       <el-descriptions-item label="所在区域">{{ detail.regionText }}</el-descriptions-item>
@@ -28,7 +26,7 @@
       <el-descriptions-item label="创建时间">{{ detail.createdAt }}</el-descriptions-item>
       <el-descriptions-item label="更新时间">{{ detail.updatedAt }}</el-descriptions-item>
     </el-descriptions>
-    
+
     <el-divider>关联疾病</el-divider>
     <div>
       <el-tag v-for="item in detail.diseases || []" :key="item.id" class="mr-8px mb-8px">{{ item.name }}</el-tag>
@@ -39,40 +37,41 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-// 【修改点2】必须导入 ElMessage
 import { ElMessage } from 'element-plus'
-import { getPsychOrgDetail } from '@/api/resource/rehab/psychologicalOrg'
+import { getPsychOrgDetail, type PsychOrgItem } from '@/api/resource/rehab/psychologicalOrg'
+
+type OrgDetailView = PsychOrgItem & {
+  regionText?: string
+  isFreeText?: string
+}
 
 const visible = ref(false)
-const detail = ref<any>({})
+const detail = ref<OrgDetailView>({} as OrgDetailView)
 
 const open = async (id: number) => {
-  console.log('尝试打开详情弹窗, ID:', id) // 调试日志
   visible.value = true
-  detail.value = {} 
-  
+  detail.value = {} as OrgDetailView
+
   try {
     const res = await getPsychOrgDetail(id)
     const data = res.data
-    
+
     if (!data) {
       ElMessage.warning('未获取到详情数据')
-      visible.value = false // 没数据则关闭
+      visible.value = false
       return
     }
 
     detail.value = {
       ...data,
-      regionText: `${data?.provinceName || ''} ${data?.cityName || ''} ${data?.districtName || ''}`.trim() || '-',
-      isFreeText: data?.isFree === true ? '是' : (data?.isFree === false ? '否' : '-')
+      regionText: `${data.provinceName || ''} ${data.cityName || ''} ${data.districtName || ''}`.trim() || '-',
+      isFreeText: data.isFree === 1 ? '是' : data.isFree === 0 ? '否' : '-',
     }
-  } catch (error) {
-    console.error('获取详情失败', error)
+  } catch {
     ElMessage.error('获取详情失败')
-    visible.value = false 
+    visible.value = false
   }
 }
 
-// 【修改点3】确保暴露
 defineExpose({ open })
 </script>

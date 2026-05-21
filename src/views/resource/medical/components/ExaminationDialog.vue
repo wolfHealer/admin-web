@@ -235,9 +235,7 @@ const loadDiseaseOptions = async (keyword = '') => {
   diseaseLoading.value = true
   try {
     const res = await getDiseaseOptions(keyword)
-    if ((res as any).code === 200) {
-      diseaseOptions.value = (res as any).data || []
-    }
+    diseaseOptions.value = res.data ?? []
   } finally {
     diseaseLoading.value = false
   }

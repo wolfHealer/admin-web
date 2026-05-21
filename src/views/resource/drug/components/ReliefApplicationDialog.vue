@@ -9,9 +9,9 @@
     <el-form ref="formRef" :model="formData" :rules="formRules" label-width="120px">
       <el-row :gutter="16">
         <el-col :span="12">
-          <el-form-item label="援助项目" prop="project_id">
+          <el-form-item label="援助项目" prop="projectId">
             <el-select
-              v-model="formData.project_id"
+              v-model="formData.projectId"
               filterable
               remote
               reserve-keyword
@@ -25,24 +25,44 @@
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="用户ID" prop="user_id">
-            <el-input-number v-model="formData.user_id" :min="1" style="width: 100%" />
+          <el-form-item label="用户ID" prop="userId">
+            <el-input-number v-model="formData.userId" :min="1" style="width: 100%" />
           </el-form-item>
         </el-col>
       </el-row>
 
       <el-row :gutter="16">
-        <el-col :span="12"><el-form-item label="患者姓名" prop="patient_name"><el-input v-model="formData.patient_name" /></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="联系电话" prop="contact_phone"><el-input v-model="formData.contact_phone" /></el-form-item></el-col>
+        <el-col :span="12">
+          <el-form-item label="患者姓名" prop="patientName">
+            <el-input v-model="formData.patientName" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="联系电话" prop="contactPhone">
+            <el-input v-model="formData.contactPhone" />
+          </el-form-item>
+        </el-col>
       </el-row>
 
       <el-row :gutter="16">
-        <el-col :span="12"><el-form-item label="证件密文" prop="patient_id_card_enc"><el-input v-model="formData.patient_id_card_enc" /></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="证件脱敏" prop="patient_id_card_mask"><el-input v-model="formData.patient_id_card_mask" placeholder="如 1101********1234" /></el-form-item></el-col>
+        <el-col :span="12">
+          <el-form-item label="证件密文" prop="patientIdCardEnc">
+            <el-input v-model="formData.patientIdCardEnc" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="证件脱敏" prop="patientIdCardMask">
+            <el-input v-model="formData.patientIdCardMask" placeholder="如 1101********1234" />
+          </el-form-item>
+        </el-col>
       </el-row>
 
-      <el-form-item label="诊断证明" prop="diagnosis_proof"><el-input v-model="formData.diagnosis_proof" placeholder="文件链接" /></el-form-item>
-      <el-form-item label="收入证明" prop="income_proof"><el-input v-model="formData.income_proof" placeholder="文件链接" /></el-form-item>
+      <el-form-item label="诊断证明" prop="diagnosisProof">
+        <el-input v-model="formData.diagnosisProof" placeholder="文件链接" />
+      </el-form-item>
+      <el-form-item label="收入证明" prop="incomeProof">
+        <el-input v-model="formData.incomeProof" placeholder="文件链接" />
+      </el-form-item>
 
       <el-row :gutter="16">
         <el-col :span="8">
@@ -56,19 +76,24 @@
           </el-form-item>
         </el-col>
         <el-col :span="8">
-          <el-form-item label="提交时间" prop="submit_time">
-            <el-date-picker v-model="formData.submit_time" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
+          <el-form-item label="提交时间" prop="submitTime">
+            <el-date-picker
+              v-model="formData.submitTime"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              style="width: 100%"
+            />
           </el-form-item>
         </el-col>
         <el-col :span="8">
-          <el-form-item label="审核人ID" prop="reviewer_id">
-            <el-input-number v-model="formData.reviewer_id" :min="0" style="width: 100%" />
+          <el-form-item label="审核人ID" prop="reviewerId">
+            <el-input-number v-model="formData.reviewerId" :min="0" style="width: 100%" />
           </el-form-item>
         </el-col>
       </el-row>
 
-      <el-form-item label="审核备注 / 驳回原因" prop="reject_reason">
-        <el-input v-model="formData.reject_reason" type="textarea" :rows="3" />
+      <el-form-item label="审核备注 / 驳回原因" prop="rejectReason">
+        <el-input v-model="formData.rejectReason" type="textarea" :rows="3" />
       </el-form-item>
     </el-form>
 
@@ -104,31 +129,31 @@ const projectLoading = ref(false)
 const projectOptions = ref<ReliefProjectItem[]>([])
 
 const createEmptyForm = (): ReliefApplicationItem => ({
-  project_id: null,
-  user_id: null,
-  patient_name: '',
-  patient_id_card_enc: '',
-  patient_id_card_mask: '',
-  diagnosis_proof: '',
-  income_proof: '',
-  contact_phone: '',
+  projectId: null,
+  userId: null,
+  patientName: '',
+  patientIdCardEnc: '',
+  patientIdCardMask: '',
+  diagnosisProof: '',
+  incomeProof: '',
+  contactPhone: '',
   status: 'pending',
-  submit_time: '',
-  reviewer_id: null,
-  reject_reason: ''
+  submitTime: '',
+  reviewerId: null,
+  rejectReason: '',
 })
 
 const formData = reactive<ReliefApplicationItem>(createEmptyForm())
 
 const formRules: FormRules = {
-  project_id: [{ required: true, message: '请选择援助项目', trigger: 'change' }],
-  user_id: [{ required: true, message: '请输入用户ID', trigger: 'change' }],
-  patient_name: [{ required: true, message: '请输入患者姓名', trigger: 'blur' }],
-  patient_id_card_mask: [{ required: true, message: '请输入脱敏证件号', trigger: 'blur' }],
-  diagnosis_proof: [{ required: true, message: '请输入诊断证明链接', trigger: 'blur' }],
-  income_proof: [{ required: true, message: '请输入收入证明链接', trigger: 'blur' }],
-  contact_phone: [{ required: true, message: '请输入联系电话', trigger: 'blur' }],
-  submit_time: [{ required: true, message: '请选择提交时间', trigger: 'change' }]
+  projectId: [{ required: true, message: '请选择援助项目', trigger: 'change' }],
+  userId: [{ required: true, message: '请输入用户ID', trigger: 'change' }],
+  patientName: [{ required: true, message: '请输入患者姓名', trigger: 'blur' }],
+  patientIdCardMask: [{ required: true, message: '请输入脱敏证件号', trigger: 'blur' }],
+  diagnosisProof: [{ required: true, message: '请输入诊断证明链接', trigger: 'blur' }],
+  incomeProof: [{ required: true, message: '请输入收入证明链接', trigger: 'blur' }],
+  contactPhone: [{ required: true, message: '请输入联系电话', trigger: 'blur' }],
+  submitTime: [{ required: true, message: '请选择提交时间', trigger: 'change' }],
 }
 
 watch(() => props.modelValue, async (val) => {
@@ -144,6 +169,7 @@ watch(() => props.modelValue, async (val) => {
     await searchProjects('')
   }
 })
+
 watch(dialogVisible, (val) => {
   emit('update:modelValue', val)
   if (!val) resetForm()
@@ -152,8 +178,13 @@ watch(dialogVisible, (val) => {
 const searchProjects = async (keyword: string) => {
   projectLoading.value = true
   try {
-    const res = await getReliefProjectList({ page: 1, page_size: 20, keyword, audit_status: 1 })
-    projectOptions.value = ((res as any).data?.list || []) as ReliefProjectItem[]
+    const res = await getReliefProjectList({
+      page: 1,
+      pageSize: 20,
+      keyword,
+      auditStatus: 1,
+    })
+    projectOptions.value = res.data?.list ?? []
   } finally {
     projectLoading.value = false
   }

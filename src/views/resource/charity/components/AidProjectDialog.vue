@@ -109,7 +109,7 @@ import {
   searchDiseaseOptions,
   updateReliefProject,
   type DiseaseOption,
-  type ReliefProjectItem,
+  type ReliefProjectForm,
 } from '@/api/resource/charity/project'
 
 const props = defineProps<{ modelValue: boolean; projectId?: number }>()
@@ -121,7 +121,7 @@ const diseaseLoading = ref(false)
 const diseaseOptions = ref<DiseaseOption[]>([])
 
 // 默认表单结构
-const getDefaultForm = (): Partial<ReliefProjectItem> => ({
+const getDefaultForm = (): ReliefProjectForm => ({
   reliefType: '',
   name: '',
   organizer: '',
@@ -141,7 +141,7 @@ const getDefaultForm = (): Partial<ReliefProjectItem> => ({
   diseaseIds: [],
 })
 
-const form = reactive<Partial<ReliefProjectItem>>(getDefaultForm())
+const form = reactive<ReliefProjectForm>(getDefaultForm())
 
 const rules: FormRules = {
   reliefType: [{ required: true, message: '请选择救助类型', trigger: 'change' }],
@@ -163,12 +163,9 @@ const loadDiseaseOptions = async (keyword = '') => {
   if (!keyword) return 
   diseaseLoading.value = true
   try {
-    const res = await searchDiseaseOptions(keyword)
-    // 确保正确提取列表数据
-    const list = Array.isArray(res.data) ? res.data : (res.data?.list || [])
-    diseaseOptions.value = list
-  } catch (error) {
-    console.error('加载疾病选项失败', error)
+    diseaseOptions.value = await searchDiseaseOptions(keyword)
+  } catch {
+    diseaseOptions.value = []
   } finally {
     diseaseLoading.value = false
   }
@@ -180,24 +177,19 @@ const handleSubmit = async () => {
   
   saving.value = true
   try {
-    const payload: any = {
-      ...form,
-    }
-    
-    // 提交时通常不需要 diseases 对象数组，只保留 diseaseIds
-    delete payload.diseases 
+    const payload: ReliefProjectForm = { ...form }
 
     if (props.projectId) {
       await updateReliefProject(props.projectId, payload)
     } else {
       await addReliefProject(payload)
     }
-    
+
     ElMessage.success('保存成功')
     emit('update:modelValue', false)
     emit('success')
-  } catch (error) {
-    console.error('保存失败', error)
+  } catch {
+    ElMessage.error('保存失败')
   } finally {
     saving.value = false
   }
@@ -207,25 +199,20 @@ const loadDetail = async (id: number) => {
   try {
     const res = await getReliefProjectDetail(id)
     
-    // 【修复点】：明确获取 res.data，并增加非空判断
-    // res 的类型是 ApiResponse<ReliefProjectItem>
-    // res.data 的类型是 ReliefProjectItem
     const item = res.data
-    
+
     if (!item) {
       ElMessage.warning('未获取到项目详情')
       return
     }
 
     resetForm()
-    
-    // 【修复点】：直接使用 item 的属性，TypeScript 现在能正确识别 item 为 ReliefProjectItem
+
     Object.assign(form, {
       id: item.id,
       name: item.name,
       organizer: item.organizer,
-      // 兼容后端可能返回 type 或 reliefType
-      reliefType: (item as any).reliefType || (item as any).type, 
+      reliefType: item.reliefType,
       applyCondition: item.applyCondition,
       reliefStandard: item.reliefStandard,
       applyDeadline: item.applyDeadline,
@@ -249,8 +236,7 @@ const loadDetail = async (id: number) => {
     if (item.diseases && Array.isArray(item.diseases)) {
       diseaseOptions.value = item.diseases
     }
-  } catch (error) {
-    console.error('加载详情失败', error)
+  } catch {
     ElMessage.error('加载详情失败')
   }
 }

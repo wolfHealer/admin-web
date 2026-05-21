@@ -159,3 +159,34 @@ src/views/resource/rehab/
     ├── PsychologicalSupportViewDialog.vue
     ├── ResourceDockingDialog.vue
     └── ResourceDockingViewDialog.vue
+
+
+
+第一阶段（P0，1–2 周）
+├── request.ts：401 / reject / token 统一
+├── login：表单 bug、切换入口、背景图
+├── community：分页、API 参数、字段命名
+├── user API：deleteUser 路径
+├── region API：响应访问方式
+├── charity List：res.data 访问
+└── 修复阻塞 build 的核心 TS 错误
+
+第二阶段（P1，2–4 周）
+├── 统一 types/api.ts + request 泛型
+├── 抽取 useTable / useCrudDialog
+├── 路由 meta 驱动菜单
+├── 登录后 getUser + 401 完整登出
+├── expert 模块补全或暂时下线路由
+└── resource 各子模块 API normalize 对齐 hospital 模式  ✅
+
+第三阶段（P2）
+├── token 读取优化
+├── Resource Tab 路由 watch 同步
+├── 搜索 debounce
+└── 大表格虚拟滚动（如有需要）  # todo
+
+第四阶段（P3）
+├── 清理 console / as any / 死代码
+├── Login 改 TS # todo
+├── 统一命名规范（API 层 normalize） ✅
+└── 同步 README
