@@ -45,6 +45,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '病友交流', menu: true, icon: 'ChatDotRound', order: 4 },
       },
       {
+        path: 'community/reports',
+        name: 'CommunityPostReports',
+        component: () => import('@/views/community/PostReportList.vue'),
+        meta: { title: '举报审核', menu: true, icon: 'Warning', order: 45 },
+      },
+      {
         path: 'user',
         name: 'User',
         component: () => import('@/views/user/User.vue'),

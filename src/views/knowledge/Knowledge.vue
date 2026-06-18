@@ -1,7 +1,7 @@
 <template>
   <div class="knowledge-page">
     <el-tabs v-model="activeTab" class="knowledge-tabs">
-      <el-tab-pane label="分类管理" name="category">
+      <el-tab-pane label="疾病分类" name="category">
         <el-row :gutter="20">
           <el-col :span="8">
             <CategoryTree
@@ -43,7 +43,7 @@
         </el-row>
       </el-tab-pane>
 
-      <el-tab-pane label="标签管理" name="tag">
+      <el-tab-pane label="疾病标签" name="tag">
         <TagTable
           :table-data="tagTableData"
           :loading="tagLoading"
@@ -69,6 +69,33 @@
           @view="handleViewDisease"
           @search="handleDiseaseSearch"
           @reset="handleDiseaseReset"
+        />
+      </el-tab-pane>
+
+      <el-tab-pane label="科普文章" name="article">
+        <ArticleTable
+          :table-data="articleTableData"
+          :filter-tag-list="articleFilterTagOptions"
+          :loading="articleLoading"
+          :pagination="articlePagination"
+          @add="handleAddArticle"
+          @edit="handleEditArticle"
+          @delete="handleDeleteArticle"
+          @view="handleViewArticle"
+          @search="handleArticleSearch"
+          @reset="handleArticleReset"
+        />
+      </el-tab-pane>
+
+      <el-tab-pane label="文章标签" name="article-tag">
+        <ArticleTagTable
+          :table-data="articleTagTableData"
+          :loading="articleTagLoading"
+          @add="handleAddArticleTag"
+          @edit="handleEditArticleTag"
+          @delete="handleDeleteArticleTag"
+          @search="handleArticleTagSearch"
+          @reset="handleArticleTagReset"
         />
       </el-tab-pane>
     </el-tabs>
@@ -99,6 +126,23 @@
     />
 
     <DiseaseViewDialog v-model="viewDialog.visible" :data="viewDialog.data" />
+
+    <ArticleDialog
+      v-model="articleDialog.visible"
+      :is-edit="articleDialog.isEdit"
+      :data="articleDialog.data"
+      :tag-list="articleTagOptions"
+      @submit="submitArticle"
+    />
+
+    <ArticleTagDialog
+      v-model="articleTagDialog.visible"
+      :is-edit="articleTagDialog.isEdit"
+      :data="articleTagDialog.data"
+      @submit="submitArticleTag"
+    />
+
+    <ArticleViewDialog v-model="articleViewDialog.visible" :data="articleViewDialog.data" />
   </div>
 </template>
 
@@ -130,6 +174,33 @@ import TagDialog from './components/TagDialog.vue'
 import DiseaseTable from './components/DiseaseTable.vue'
 import DiseaseDialog from './components/DiseaseDialog.vue'
 import DiseaseViewDialog from './components/DiseaseViewDialog.vue'
+import ArticleTable from './components/ArticleTable.vue'
+import ArticleDialog from './components/ArticleDialog.vue'
+import ArticleViewDialog from './components/ArticleViewDialog.vue'
+import ArticleTagTable from './components/ArticleTagTable.vue'
+import ArticleTagDialog from './components/ArticleTagDialog.vue'
+import {
+  createArticleTag,
+  deleteArticleTag,
+  getArticleTagDetail,
+  getArticleTagList,
+  toArticleTagOption,
+  updateArticleTag,
+  type ArticleTagItem,
+  type ArticleTagStatus,
+} from '@/api/knowledge/articleTag'
+import {
+  createArticle,
+  deleteArticle,
+  getArticleDetail,
+  getArticleList,
+  updateArticle,
+  type ArticleDetail,
+  type ArticleListItem,
+  type ArticleStatus,
+  type ArticleSubmitPayload,
+  type ArticleTag,
+} from '@/api/knowledge/article'
 
 const activeTab = ref('category')
 
@@ -137,12 +208,23 @@ const categoryTree = ref<CategoryTreeNode[]>([])
 const currentCategory = ref<CategoryTreeNode | null>(null)
 const tagTableData = ref<TagItem[]>([])
 const diseaseTableData = ref<Disease[]>([])
+const articleTableData = ref<ArticleListItem[]>([])
+const articleTagTableData = ref<ArticleTagItem[]>([])
+const articleFilterTagOptions = ref<ArticleTag[]>([])
 
 const categoryLoading = ref(false)
 const tagLoading = ref(false)
 const diseaseLoading = ref(false)
+const articleLoading = ref(false)
+const articleTagLoading = ref(false)
 
 const pagination = reactive({
+  currentPage: 1,
+  pageSize: 10,
+  total: 0,
+})
+
+const articlePagination = reactive({
   currentPage: 1,
   pageSize: 10,
   total: 0,
@@ -158,6 +240,17 @@ const diseaseFilters = reactive({
 const tagFilters = reactive({
   keyword: '',
   status: null as number | null,
+})
+
+const articleFilters = reactive({
+  keyword: '',
+  status: null as ArticleStatus | null,
+  tagId: null as number | null,
+})
+
+const articleTagFilters = reactive({
+  keyword: '',
+  status: null as ArticleTagStatus | null,
 })
 
 const categoryDialog = reactive({
@@ -184,7 +277,28 @@ const viewDialog = reactive({
   data: {} as Disease,
 })
 
+const articleDialog = reactive({
+  visible: false,
+  isEdit: false,
+  data: null as Partial<ArticleDetail> | null,
+})
+
+const articleViewDialog = reactive({
+  visible: false,
+  data: {} as Partial<ArticleDetail>,
+})
+
+const articleTagDialog = reactive({
+  visible: false,
+  isEdit: false,
+  data: null as ArticleTagItem | null,
+})
+
 const tagOptions = computed(() => tagTableData.value.filter((item) => item.status === 1))
+
+const articleTagOptions = computed(() =>
+  articleTagTableData.value.filter((item) => item.status === 1).map(toArticleTagOption)
+)
 
 const flattenCategories = (nodes: CategoryTreeNode[], result: CategoryTreeNode[] = []) => {
   nodes.forEach((node) => {
@@ -435,9 +549,185 @@ const handleDiseaseReset = () => {
   loadDiseaseList()
 }
 
+const loadArticleList = async () => {
+  try {
+    articleLoading.value = true
+    const res = await getArticleList({
+      page: articlePagination.currentPage,
+      pageSize: articlePagination.pageSize,
+      keyword: articleFilters.keyword || undefined,
+      status: articleFilters.status,
+      tagId: articleFilters.tagId,
+    })
+    articleTableData.value = res.data?.list || []
+    articlePagination.total = res.data?.total || 0
+  } catch {
+    ElMessage.error('获取文章列表失败')
+  } finally {
+    articleLoading.value = false
+  }
+}
+
+const loadArticleTagList = async () => {
+  try {
+    articleTagLoading.value = true
+    const res = await getArticleTagList({
+      keyword: articleTagFilters.keyword || undefined,
+      status: articleTagFilters.status,
+    })
+    articleTagTableData.value = res.data || []
+    articleFilterTagOptions.value = (res.data || [])
+      .filter((item) => item.status === 1)
+      .map(toArticleTagOption)
+  } catch {
+    ElMessage.error('获取文章标签列表失败')
+  } finally {
+    articleTagLoading.value = false
+  }
+}
+
+const handleAddArticle = () => {
+  articleDialog.isEdit = false
+  articleDialog.data = {
+    status: 0,
+    isTop: 0,
+    isRecommend: 0,
+    contentType: 'rich',
+    tagIds: [],
+    diseaseIds: [],
+    blocks: [{ blockType: 'paragraph', sortNo: 1, content: '' }],
+  }
+  articleDialog.visible = true
+}
+
+const handleEditArticle = async (row: ArticleListItem) => {
+  try {
+    const res = await getArticleDetail(row.id)
+    articleDialog.isEdit = true
+    articleDialog.data = res.data
+    articleDialog.visible = true
+  } catch {
+    ElMessage.error('获取文章详情失败')
+  }
+}
+
+const handleViewArticle = async (row: ArticleListItem) => {
+  try {
+    const res = await getArticleDetail(row.id)
+    articleViewDialog.data = res.data
+    articleViewDialog.visible = true
+  } catch {
+    ElMessage.error('获取文章详情失败')
+  }
+}
+
+const handleDeleteArticle = async (row: ArticleListItem) => {
+  await ElMessageBox.confirm(
+    `确定删除文章「${row.title}」吗？删除后不可恢复，关联内容块与标签/病种关系将一并删除。`,
+    '提示',
+    { type: 'warning' }
+  )
+  await deleteArticle(row.id)
+  ElMessage.success('删除成功')
+  await loadArticleList()
+}
+
+const submitArticle = async (payload: ArticleSubmitPayload, id?: number) => {
+  if (id) {
+    await updateArticle(id, payload)
+    ElMessage.success('文章更新成功')
+  } else {
+    await createArticle(payload)
+    ElMessage.success('文章创建成功')
+  }
+  await loadArticleList()
+}
+
+const handleArticleSearch = (params: Record<string, unknown>) => {
+  articleFilters.keyword = String(params.keyword || '')
+  const status = params.status
+  articleFilters.status =
+    status === 0 || status === 1 || status === 2 ? status : null
+  articleFilters.tagId = (params.tagId as number | null | undefined) ?? null
+  articlePagination.currentPage = Number(params.page || 1)
+  articlePagination.pageSize = Number(params.pageSize || 10)
+  loadArticleList()
+}
+
+const handleArticleReset = () => {
+  articleFilters.keyword = ''
+  articleFilters.status = null
+  articleFilters.tagId = null
+  articlePagination.currentPage = 1
+  articlePagination.pageSize = 10
+  loadArticleList()
+}
+
+const handleAddArticleTag = () => {
+  articleTagDialog.isEdit = false
+  articleTagDialog.data = null
+  articleTagDialog.visible = true
+}
+
+const handleEditArticleTag = async (row: ArticleTagItem) => {
+  try {
+    const res = await getArticleTagDetail(row.id)
+    articleTagDialog.isEdit = true
+    articleTagDialog.data = res.data
+    articleTagDialog.visible = true
+  } catch {
+    ElMessage.error('获取文章标签详情失败')
+  }
+}
+
+const handleDeleteArticleTag = async (row: ArticleTagItem) => {
+  await ElMessageBox.confirm(`确定删除文章标签「${row.name}」吗？`, '提示', { type: 'warning' })
+  await deleteArticleTag(row.id)
+  ElMessage.success('删除成功')
+  await Promise.all([loadArticleTagList(), loadArticleList()])
+}
+
+const submitArticleTag = async (formData: {
+  id: number | null
+  name: string
+  type: string
+  sortOrder: number
+  status: 0 | 1
+}) => {
+  const payload = {
+    name: formData.name,
+    type: formData.type,
+    sortOrder: formData.sortOrder,
+    status: formData.status,
+  }
+
+  if (articleTagDialog.isEdit && formData.id) {
+    await updateArticleTag(formData.id, payload)
+    ElMessage.success('文章标签更新成功')
+  } else {
+    await createArticleTag(payload)
+    ElMessage.success('文章标签创建成功')
+  }
+  await Promise.all([loadArticleTagList(), loadArticleList()])
+}
+
+const handleArticleTagSearch = (params: { keyword: string; status: number | null }) => {
+  articleTagFilters.keyword = params.keyword || ''
+  const status = params.status
+  articleTagFilters.status =
+    status === 0 || status === 1 ? status : null
+  loadArticleTagList()
+}
+
+const handleArticleTagReset = () => {
+  articleTagFilters.keyword = ''
+  articleTagFilters.status = null
+  loadArticleTagList()
+}
+
 onMounted(async () => {
-  await Promise.all([loadCategoryTree(), loadTagList()])
-  await loadDiseaseList()
+  await Promise.all([loadCategoryTree(), loadTagList(), loadArticleTagList()])
+  await Promise.all([loadDiseaseList(), loadArticleList()])
 })
 </script>
 

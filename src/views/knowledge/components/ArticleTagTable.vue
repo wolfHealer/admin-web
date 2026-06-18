@@ -2,13 +2,20 @@
   <el-card>
     <template #header>
       <div class="card-header">
-        <span>疾病标签列表</span>
+        <span>文章标签列表</span>
         <el-button type="primary" @click="$emit('add')">新增标签</el-button>
       </div>
     </template>
 
     <div class="filter-bar">
-      <el-input v-model="filters.keyword" placeholder="搜索标签名称/编码" clearable style="width: 220px" @clear="handleSearch" />
+      <el-input
+        v-model="filters.keyword"
+        placeholder="搜索标签名称 / 类型"
+        clearable
+        style="width: 220px"
+        @clear="handleSearch"
+        @keyup.enter="handleSearch"
+      />
       <el-select v-model="filters.status" placeholder="状态" clearable style="width: 140px" @change="handleSearch">
         <el-option label="启用" :value="1" />
         <el-option label="停用" :value="0" />
@@ -19,12 +26,14 @@
 
     <el-table :data="tableData" v-loading="loading" row-key="id">
       <el-table-column prop="name" label="标签名称" min-width="160" />
-      <el-table-column prop="code" label="标签编码" min-width="180" />
+      <el-table-column prop="type" label="标签类型" min-width="140" />
       <el-table-column prop="useCount" label="使用次数" width="120" />
       <el-table-column prop="sortOrder" label="排序" width="100" />
       <el-table-column prop="status" label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.status === 1 ? 'success' : 'info'">{{ row.status === 1 ? '启用' : '停用' }}</el-tag>
+          <el-tag :type="row.status === 1 ? 'success' : 'info'">
+            {{ row.status === 1 ? '启用' : '停用' }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="updatedAt" label="更新时间" width="180" />
@@ -40,19 +49,20 @@
 
 <script setup lang="ts">
 import { reactive } from 'vue'
-import type { TagItem } from '@/api/knowledge/knowledge'
+import type { ArticleTagItem } from '@/api/knowledge/articleTag'
 
 interface Props {
-  tableData: TagItem[]
+  tableData: ArticleTagItem[]
   loading: boolean
 }
 
 defineProps<Props>()
+
 const emit = defineEmits<{
   add: []
-  edit: [row: TagItem]
-  delete: [row: TagItem]
-  search: [params: any]
+  edit: [row: ArticleTagItem]
+  delete: [row: ArticleTagItem]
+  search: [params: { keyword: string; status: number | null }]
   reset: []
 }>()
 
